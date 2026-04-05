@@ -2,10 +2,10 @@ package main
 
 import (
 	"container/list"
+	"log"
 )
 
 type  Bucket struct{
-	bucketIndex int
 	entries *list.List 
 }
 
@@ -21,6 +21,9 @@ type HashTableEntry struct {
 }
 
 func NewHashTable(numBuckets int) *HashTable {
+	if numBuckets <= 0 {
+		log.Fatal("Number of buckets must be greater than 0")
+	}
 	buckets := make([]*Bucket, numBuckets)
 	for i := 0; i < numBuckets; i++ {
 		buckets[i] = NewBucket(i)
@@ -48,7 +51,6 @@ func bucketIndex(s string, numBuckets int) int {
 
 func NewBucket(bucketIndex int) *Bucket {
 	return &Bucket{
-		bucketIndex: bucketIndex,
 		entries: list.New(),
 	}
 }
@@ -72,7 +74,7 @@ func (ht *HashTable) Insert(key string, value interface{}) {
 	})
 }
 
-func (ht *HashTable) GET(key string) (interface{},bool){
+func (ht *HashTable) Get(key string) (interface{},bool){
 	index := bucketIndex(key,ht.numBuckets)
 	bucket := ht.buckets[index]
 	for e := bucket.entries.Front(); e != nil; e = e.Next() {
@@ -97,7 +99,6 @@ func (ht *HashTable) Delete(key string) bool {
 	return false
 }
 
-
 func main() {
 	// test get and Insert
 	ht := NewHashTable(10)
@@ -105,7 +106,7 @@ func main() {
 	ht.Insert("age", 30)
 	ht.Insert("city", "New York")
 	
-	if value, found := ht.GET("name"); found {
+	if value, found := ht.Get("name"); found {
 		println("name:", value.(string))
 	} else {
 		println("name not found")
