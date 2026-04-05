@@ -70,27 +70,31 @@ func (ht *HashTable) Insert(key string, value interface{}) {
 		key: key,
 		value: value,
 	})
-}	
+}
 
-func main() {
-	//test bucket creation
-	bucket := NewBucket(0)
-	println(bucket.bucketIndex)
-	//test hash table creation
-	hashTable := NewHashTable(10)
-	println(hashTable.buckets)
-	//test insertion
-	hashTable.Insert("key1", "value1")
-	hashTable.Insert("key2", "value2")
-	hashTable.Insert("key3", "value3")
-	//test retrieval
-	index := bucketIndex("key1", hashTable.numBuckets)
-	bucket = hashTable.buckets[index]
+func (ht *HashTable) GET(key string) (interface{},bool){
+	index := bucketIndex(key,ht.numBuckets)
+	bucket := ht.buckets[index]
 	for e := bucket.entries.Front(); e != nil; e = e.Next() {
 		entry := e.Value.(*HashTableEntry)
-		if entry.key == "key1" {
-			println(entry.value.(string))
+		if entry.key == key {
+			return entry.value,true
 		}
+	}
+	return nil,false
+}
+
+func main() {
+	// test get and Insert
+	ht := NewHashTable(10)
+	ht.Insert("name", "Alice")
+	ht.Insert("age", 30)
+	ht.Insert("city", "New York")
+	
+	if value, found := ht.GET("name"); found {
+		println("name:", value.(string))
+	} else {
+		println("name not found")
 	}
 }
 
