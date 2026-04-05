@@ -53,6 +53,25 @@ func NewBucket(bucketIndex int) *Bucket {
 	}
 }
 
+func (ht *HashTable) Insert(key string, value interface{}) {
+	index := bucketIndex(key, ht.numBuckets)
+	bucket := ht.buckets[index]
+	//check if the key already exists in the bucket
+	for e := bucket.entries.Front(); e != nil; e = e.Next() {
+		entry := e.Value.(*HashTableEntry)
+		if entry.key == key {
+			//update the value if the key already exists
+			entry.value = value
+			return
+		}
+	}
+	//if the key does not exist, add a new entry to the bucket
+	bucket.entries.PushBack(&HashTableEntry{
+		key: key,
+		value: value,
+	})
+}	
+
 func main() {
 	//test bucket creation
 	bucket := NewBucket(0)
@@ -60,6 +79,19 @@ func main() {
 	//test hash table creation
 	hashTable := NewHashTable(10)
 	println(hashTable.buckets)
+	//test insertion
+	hashTable.Insert("key1", "value1")
+	hashTable.Insert("key2", "value2")
+	hashTable.Insert("key3", "value3")
+	//test retrieval
+	index := bucketIndex("key1", hashTable.numBuckets)
+	bucket = hashTable.buckets[index]
+	for e := bucket.entries.Front(); e != nil; e = e.Next() {
+		entry := e.Value.(*HashTableEntry)
+		if entry.key == "key1" {
+			println(entry.value.(string))
+		}
+	}
 }
 
 
