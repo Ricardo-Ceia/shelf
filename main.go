@@ -1,17 +1,12 @@
 package main
 
+import (
+	"container/list"
+)
+
 type  Bucket struct{
 	bucketIndex int
-	entries *LinkedList
-}
-
-type LinkedList struct {
-	head *Node
-}
-
-type Node struct {
-	value string
-	next  *Node
+	entries *list.List 
 }
 
 func fnv_a1(s string) uint64 {
@@ -32,37 +27,17 @@ func bucketIndex(s string, numBuckets int) int {
 func NewBucket(bucketIndex int) *Bucket {
 	return &Bucket{
 		bucketIndex: bucketIndex,
-		entries: NewLinkedList(),
+		entries: list.New(),
 	}
-}
-
-func NewLinkedList() *LinkedList {
-	return &LinkedList{head: nil}
-}
-
-func (ll *LinkedList) Append(value string) {
-	newNode := &Node{value: value, next: nil}
-	if ll.head==nil{
-		ll.head=newNode
-		return
-	}
-	current := ll.head
-	for current.next!=nil{
-		current=current.next
-	}
-	current.next=newNode
 }
 
 func main() {
 	//test LinkedList
-	ll := NewLinkedList()
-	ll.Append("first")
-	ll.Append("second")
-	ll.Append("third")
-	current := ll.head
-	for current != nil {
-		print(current.value, " ")
-		current = current.next
+	ll := list.New()
+	ll.PushBack("aleluia")
+	ll.PushBack("aleluia2")
+	for e := ll.Front(); e != nil; e = e.Next() {
+		println(e.Value.(string))
 	}
 	// Example usage
 	str := "aleluia"
