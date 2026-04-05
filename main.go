@@ -9,6 +9,17 @@ type  Bucket struct{
 	entries *list.List 
 }
 
+type HashTable struct {
+	buckets []*Bucket
+	numBuckets int
+}
+
+type HashTableEntry struct {
+	key string
+	//the value can be of any type, so we use an empty interface
+	value interface{}
+}
+
 func fnv_a1(s string) uint64 {
 	var h uint64 = 14695981039346656037
 	for i := 0; i < len(s); i++ {
