@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"fmt"
 	"hash/fnv"
+	"sync"
 )
 
 type Entry[K comparable, V any] struct {
@@ -16,9 +17,30 @@ type Bucket[K comparable, V any] struct {
 }
 
 type HashTable[K comparable, V any] struct {
-	buckets    []*Bucket[K, V]
+	numShards int
+	shards []*Shard[K, V]
+}
+
+type Shard[K comparable, V any] struct {
+	mu 	sync.RWMutex
 	numBuckets int
-	count      int
+	count int
+	buckets []*Bucket[K, V]
+}
+
+func newShard[K comparable, V any](numBuckets int) *Shard[K, V] {
+	if numBuckets <= 0 {
+		panic("number of buckets must be greater than 0")
+	}
+	buckets := make([]*Bucket[K, V], numBuckets)
+	for i := 0; i < numBuckets; i++ {
+		buckets[i] = NewBucket[K, V]()
+	}
+	return &Shard[K, V]{
+		numBuckets: numBuckets,
+		count: 0,
+		buckets: buckets,
+	}
 }
 
 func NewBucket[K comparable, V any]() *Bucket[K, V] {
@@ -27,19 +49,22 @@ func NewBucket[K comparable, V any]() *Bucket[K, V] {
 	}
 }
 
-func NewHashTable[K comparable, V any](numBuckets int) *HashTable[K, V] {
-	if numBuckets <= 0 {
-		panic("number of buckets must be greater than 0")
+func NewHashTable[K comparable, V any](numShards int) *HashTable[K, V] {
+	if numShards <= 0 {
+		panic("number of shards must be greater than 0")
 	}
-	buckets := make([]*Bucket[K, V], numBuckets)
-	for i := 0; i < numBuckets; i++ {
-		buckets[i] = NewBucket[K, V]()
+	shards := make([]*Shard[K, V], numShards)
+	for i := 0; i < numShards; i++ {
+		shards[i] = newShard[K, V](numShards * 2) // Each shard has more buckets to reduce collisions
 	}
 	return &HashTable[K, V]{
-		buckets:    buckets,
-		numBuckets: numBuckets,
-		count:      0,
+		numShards: numShards,
+		shards: shards,
 	}
+}
+
+func (ht *HashTable[K, V]) shardIndex(key K) int {
+	return int(hashKey(key) % uint64(ht.numShards))
 }
 
 func hashKey[K comparable](key K) uint64 {
@@ -48,13 +73,24 @@ func hashKey[K comparable](key K) uint64 {
 	return h.Sum64()
 }
 
-func (ht *HashTable[K, V]) bucketIndex(key K) int {
-	return int(hashKey(key) % uint64(ht.numBuckets))
+func (s *Shard[K, V]) bucketIndex(key K) int {
+	return int(hashKey(key) % uint64(s.numBuckets))
 }
 
 func (ht *HashTable[K, V]) Insert(key K, value V) {
-	index := ht.bucketIndex(key)
-	bucket := ht.buckets[index]
+	shardIdx := ht.shardIndex(key)
+	shard := ht.shards[shardIdx]
+
+	shard.mu.Lock()
+	defer shard.mu.Unlock()
+	
+	//check load factor before insert (do count+1 because we are about to insert a new entry) 
+	if float64(shard.count+1)/float64(shard.numBuckets) > 0.75 {
+		ht.resize(shard)
+	}
+
+	index := shard.bucketIndex(key)
+	bucket := shard.buckets[index]
 
 	for e := bucket.entries.Front(); e != nil; e = e.Next() {
 		entry := e.Value.(*Entry[K, V])
@@ -64,16 +100,38 @@ func (ht *HashTable[K, V]) Insert(key K, value V) {
 		}
 	}
 
-	bucket.entries.PushBack(&Entry[K, V]{
-		Key:   key,
-		Value: value,
-	})
-	ht.count++
+	bucket.entries.PushBack(&Entry[K, V]{Key: key, Value: value})
+	shard.count++
+}
+
+func (ht *HashTable[K, V]) resize(shard *Shard[K, V]) {
+	newNumBuckets := shard.numBuckets * 2
+	newBuckets := make([]*Bucket[K, V], newNumBuckets)
+	for i := 0; i < newNumBuckets; i++ {
+		newBuckets[i] = NewBucket[K, V]()
+	}
+
+	for _, bucket := range shard.buckets {
+		for e := bucket.entries.Front(); e != nil; e = e.Next() {
+			entry := e.Value.(*Entry[K, V])
+			index := int(hashKey(entry.Key) % uint64(newNumBuckets))
+			newBuckets[index].entries.PushBack(entry)
+		}
+	}
+
+	shard.buckets = newBuckets
+	shard.numBuckets = newNumBuckets
 }
 
 func (ht *HashTable[K, V]) Get(key K) (V, bool) {
-	index := ht.bucketIndex(key)
-	bucket := ht.buckets[index]
+	shardIdx := ht.shardIndex(key)
+	shard := ht.shards[shardIdx]
+
+	shard.mu.RLock()
+	defer shard.mu.RUnlock()
+
+	index := shard.bucketIndex(key)
+	bucket := shard.buckets[index]
 
 	for e := bucket.entries.Front(); e != nil; e = e.Next() {
 		entry := e.Value.(*Entry[K, V])
@@ -87,14 +145,20 @@ func (ht *HashTable[K, V]) Get(key K) (V, bool) {
 }
 
 func (ht *HashTable[K, V]) Delete(key K) bool {
-	index := ht.bucketIndex(key)
-	bucket := ht.buckets[index]
+	shardIdx := ht.shardIndex(key)
+	shard := ht.shards[shardIdx]
+
+	shard.mu.Lock()
+	defer shard.mu.Unlock()
+
+	index := shard.bucketIndex(key)
+	bucket := shard.buckets[index]
 
 	for e := bucket.entries.Front(); e != nil; e = e.Next() {
 		entry := e.Value.(*Entry[K, V])
 		if entry.Key == key {
 			bucket.entries.Remove(e)
-			ht.count--
+			shard.count--
 			return true
 		}
 	}
@@ -103,7 +167,14 @@ func (ht *HashTable[K, V]) Delete(key K) bool {
 }
 
 func (ht *HashTable[K, V]) Size() int {
-	return ht.count
+	size := 0
+	for _, shard := range ht.shards {
+		shard.mu.RLock()
+		size += shard.count
+		shard.mu.RUnlock()
+	}
+	
+	return size
 }
 
 func (ht *HashTable[K, V]) Contains(key K) bool {
@@ -112,65 +183,58 @@ func (ht *HashTable[K, V]) Contains(key K) bool {
 }
 
 func (ht *HashTable[K, V]) Keys() []K {
-	keys := make([]K, 0, ht.count)
-	for _, bucket := range ht.buckets {
-		for e := bucket.entries.Front(); e != nil; e = e.Next() {
-			entry := e.Value.(*Entry[K, V])
-			keys = append(keys, entry.Key)
+ 	keys := make([]K, 0, ht.Size())
+	for _, shard := range ht.shards {
+		shard.mu.RLock()
+		for _, bucket := range shard.buckets {
+			for e := bucket.entries.Front(); e != nil; e = e.Next() {
+				entry := e.Value.(*Entry[K, V])
+				keys = append(keys, entry.Key)
+			}
 		}
+		shard.mu.RUnlock()
 	}
 	return keys
 }
 
 func (ht *HashTable[K, V]) Values() []V {
-	values := make([]V, 0, ht.count)
-	for _, bucket := range ht.buckets {
-		for e := bucket.entries.Front(); e != nil; e = e.Next() {
-			entry := e.Value.(*Entry[K, V])
-			values = append(values, entry.Value)
+	values := make([]V, 0, ht.Size())
+	for _, shard := range ht.shards {
+		shard.mu.RLock()
+		for _, bucket := range shard.buckets {
+			for e := bucket.entries.Front(); e != nil; e = e.Next() {
+				entry := e.Value.(*Entry[K, V])
+				values = append(values, entry.Value)
+			}
 		}
+		shard.mu.RUnlock()
 	}
 	return values
 }
 
 func (ht *HashTable[K, V]) Clear() {
-	for _, bucket := range ht.buckets {
-		bucket.entries = list.New()
+	for _, shard := range ht.shards {
+		shard.mu.Lock()
+		for _, bucket := range shard.buckets {
+			bucket.entries.Init()
+		}
+		shard.count = 0
+		shard.mu.Unlock()
 	}
-	ht.count = 0
 }
 
 func main() {
-	ht := NewHashTable[string, string](10)
-	ht.Insert("name", "Alice")
-	ht.Insert("city", "New York")
-	ht.Insert("lang", "Go")
-
-	if value, found := ht.Get("name"); found {
-		println("name:", value)
-	} else {
-		println("name not found")
-	}
-
-	if ht.Delete("city") {
-		println("city deleted")
-	} else {
-		println("city not found")
-	}
-
-	println("size:", ht.Size())
-	println("contains lang:", ht.Contains("lang"))
-
-	keys := ht.Keys()
-	print("keys: ")
-	for i, k := range keys {
-		if i > 0 {
-			print(", ")
-		}
-		print(k)
-	}
-	println()
-
-	ht.Clear()
-	println("after clear, size:", ht.Size())
+    ht := NewHashTable[string, string](16)
+    ht.Insert("name", "Alice")
+    ht.Insert("age", "30")
+    ht.Insert("city", "Berlin")
+    if v, ok := ht.Get("name"); ok {
+        println("name:", v)
+    }
+    ht.Delete("age")
+    println("size:", ht.Size())
+    println("has age:", ht.Contains("age"))
+    println("keys:", len(ht.Keys()))
+    ht.Clear()
+    println("after clear:", ht.Size())
 }
