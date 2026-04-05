@@ -20,6 +20,17 @@ type HashTableEntry struct {
 	value interface{}
 }
 
+func NewHashTable(numBuckets int) *HashTable {
+	buckets := make([]*Bucket, numBuckets)
+	for i := 0; i < numBuckets; i++ {
+		buckets[i] = NewBucket(i)
+	}
+	return &HashTable{
+		buckets: buckets,
+		numBuckets: numBuckets,
+	}	
+}
+
 func fnv_a1(s string) uint64 {
 	var h uint64 = 14695981039346656037
 	for i := 0; i < len(s); i++ {
@@ -43,18 +54,12 @@ func NewBucket(bucketIndex int) *Bucket {
 }
 
 func main() {
-	//test LinkedList
-	ll := list.New()
-	ll.PushBack("aleluia")
-	ll.PushBack("aleluia2")
-	for e := ll.Front(); e != nil; e = e.Next() {
-		println(e.Value.(string))
-	}
-	// Example usage
-	str := "aleluia"
-	numBuckets := 30
-	index := bucketIndex(str, numBuckets)
-	println("Bucket index for", str, "is", index)
+	//test bucket creation
+	bucket := NewBucket(0)
+	println(bucket.bucketIndex)
+	//test hash table creation
+	hashTable := NewHashTable(10)
+	println(hashTable.buckets)
 }
 
 
