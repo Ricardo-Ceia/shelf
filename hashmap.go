@@ -1,4 +1,4 @@
-package main
+package shelf
 
 import (
 	"container/list"
@@ -18,14 +18,14 @@ type Bucket[K comparable, V any] struct {
 
 type HashTable[K comparable, V any] struct {
 	numShards int
-	shards []*Shard[K, V]
+	shards    []*Shard[K, V]
 }
 
 type Shard[K comparable, V any] struct {
-	mu 	sync.RWMutex
+	mu         sync.RWMutex
 	numBuckets int
-	count int
-	buckets []*Bucket[K, V]
+	count      int
+	buckets    []*Bucket[K, V]
 }
 
 func newShard[K comparable, V any](numBuckets int) *Shard[K, V] {
@@ -38,8 +38,8 @@ func newShard[K comparable, V any](numBuckets int) *Shard[K, V] {
 	}
 	return &Shard[K, V]{
 		numBuckets: numBuckets,
-		count: 0,
-		buckets: buckets,
+		count:      0,
+		buckets:    buckets,
 	}
 }
 
@@ -55,11 +55,11 @@ func NewHashTable[K comparable, V any](numShards int) *HashTable[K, V] {
 	}
 	shards := make([]*Shard[K, V], numShards)
 	for i := 0; i < numShards; i++ {
-		shards[i] = newShard[K, V](numShards * 2) // Each shard has more buckets to reduce collisions
+		shards[i] = newShard[K, V](numShards * 2)
 	}
 	return &HashTable[K, V]{
 		numShards: numShards,
-		shards: shards,
+		shards:    shards,
 	}
 }
 
@@ -83,8 +83,7 @@ func (ht *HashTable[K, V]) Insert(key K, value V) {
 
 	shard.mu.Lock()
 	defer shard.mu.Unlock()
-	
-	//check load factor before insert (do count+1 because we are about to insert a new entry) 
+
 	if float64(shard.count+1)/float64(shard.numBuckets) > 0.75 {
 		ht.resize(shard)
 	}
@@ -173,7 +172,7 @@ func (ht *HashTable[K, V]) Size() int {
 		size += shard.count
 		shard.mu.RUnlock()
 	}
-	
+
 	return size
 }
 
@@ -183,7 +182,7 @@ func (ht *HashTable[K, V]) Contains(key K) bool {
 }
 
 func (ht *HashTable[K, V]) Keys() []K {
- 	keys := make([]K, 0, ht.Size())
+	keys := make([]K, 0, ht.Size())
 	for _, shard := range ht.shards {
 		shard.mu.RLock()
 		for _, bucket := range shard.buckets {
@@ -221,20 +220,4 @@ func (ht *HashTable[K, V]) Clear() {
 		shard.count = 0
 		shard.mu.Unlock()
 	}
-}
-
-func main() {
-    ht := NewHashTable[string, string](16)
-    ht.Insert("name", "Alice")
-    ht.Insert("age", "30")
-    ht.Insert("city", "Berlin")
-    if v, ok := ht.Get("name"); ok {
-        println("name:", v)
-    }
-    ht.Delete("age")
-    println("size:", ht.Size())
-    println("has age:", ht.Contains("age"))
-    println("keys:", len(ht.Keys()))
-    ht.Clear()
-    println("after clear:", ht.Size())
 }
