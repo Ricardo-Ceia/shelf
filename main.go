@@ -84,6 +84,20 @@ func (ht *HashTable) GET(key string) (interface{},bool){
 	return nil,false
 }
 
+func (ht *HashTable) Delete(key string) bool {
+	index := bucketIndex(key,ht.numBuckets)
+	bucket := ht.buckets[index]
+	for e := bucket.entries.Front(); e != nil; e = e.Next() {
+		entry := e.Value.(*HashTableEntry)
+		if entry.key == key {
+			bucket.entries.Remove(e)
+			return true
+		}
+	}
+	return false
+}
+
+
 func main() {
 	// test get and Insert
 	ht := NewHashTable(10)
@@ -95,6 +109,12 @@ func main() {
 		println("name:", value.(string))
 	} else {
 		println("name not found")
+	}
+	//test Delete
+	if ht.Delete("age") {
+		println("age deleted")
+	} else {
+		println("age not found")
 	}
 }
 
