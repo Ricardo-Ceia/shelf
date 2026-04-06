@@ -15,7 +15,7 @@ import (
 func TestOpenCreatesDirectory(t *testing.T) {
 	dir := t.TempDir() + "/new-store"
 
-	store, err := Open(dir, 16)
+	store, err := Open(dir, 16, 0)
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
@@ -29,7 +29,7 @@ func TestOpenCreatesDirectory(t *testing.T) {
 func TestOpenEmptyStore(t *testing.T) {
 	dir := t.TempDir()
 
-	store, err := Open(dir, 16)
+	store, err := Open(dir, 16, 0)
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
@@ -43,7 +43,7 @@ func TestOpenEmptyStore(t *testing.T) {
 func TestSetAndGet(t *testing.T) {
 	dir := t.TempDir()
 
-	store, err := Open(dir, 16)
+	store, err := Open(dir, 16, 0)
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
@@ -78,7 +78,7 @@ func TestSetAndGet(t *testing.T) {
 func TestUpdateExistingKey(t *testing.T) {
 	dir := t.TempDir()
 
-	store, err := Open(dir, 16)
+	store, err := Open(dir, 16, 0)
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
@@ -100,7 +100,7 @@ func TestUpdateExistingKey(t *testing.T) {
 func TestDelete(t *testing.T) {
 	dir := t.TempDir()
 
-	store, err := Open(dir, 16)
+	store, err := Open(dir, 16, 0)
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
@@ -136,7 +136,7 @@ func TestDelete(t *testing.T) {
 func TestRecoveryAfterClose(t *testing.T) {
 	dir := t.TempDir()
 
-	store, err := Open(dir, 16)
+	store, err := Open(dir, 16, 0)
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
@@ -150,7 +150,7 @@ func TestRecoveryAfterClose(t *testing.T) {
 		t.Fatalf("Close failed: %v", err)
 	}
 
-	store2, err := Open(dir, 16)
+	store2, err := Open(dir, 16, 0)
 	if err != nil {
 		t.Fatalf("Re-open failed: %v", err)
 	}
@@ -182,7 +182,7 @@ func TestRecoveryAfterClose(t *testing.T) {
 func TestRecoveryAfterCrash(t *testing.T) {
 	dir := t.TempDir()
 
-	store, err := Open(dir, 16)
+	store, err := Open(dir, 16, 0)
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
@@ -204,7 +204,7 @@ func TestRecoveryAfterCrash(t *testing.T) {
 		t.Fatalf("WriteFile failed: %v", err)
 	}
 
-	store2, err := Open(dir, 16)
+	store2, err := Open(dir, 16, 0)
 	if err != nil {
 		t.Fatalf("Re-open after crash failed: %v", err)
 	}
@@ -222,7 +222,7 @@ func TestRecoveryAfterCrash(t *testing.T) {
 func TestCorruptedWAL(t *testing.T) {
 	dir := t.TempDir()
 
-	store, err := Open(dir, 16)
+	store, err := Open(dir, 16, 0)
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
@@ -246,7 +246,7 @@ func TestCorruptedWAL(t *testing.T) {
 		t.Fatalf("WriteFile failed: %v", err)
 	}
 
-	store2, err := Open(dir, 16)
+	store2, err := Open(dir, 16, 0)
 	if err != nil {
 		t.Fatalf("Re-open after corruption failed: %v", err)
 	}
@@ -260,7 +260,7 @@ func TestCorruptedWAL(t *testing.T) {
 func TestPartialCorruptionKeepsValidEntries(t *testing.T) {
 	dir := t.TempDir()
 
-	store, err := Open(dir, 16)
+	store, err := Open(dir, 16, 0)
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
@@ -296,7 +296,7 @@ func TestPartialCorruptionKeepsValidEntries(t *testing.T) {
 		t.Fatalf("WriteFile failed: %v", err)
 	}
 
-	store2, err := Open(dir, 16)
+	store2, err := Open(dir, 16, 0)
 	if err != nil {
 		t.Fatalf("Re-open after partial corruption failed: %v", err)
 	}
@@ -328,7 +328,7 @@ func TestPartialCorruptionKeepsValidEntries(t *testing.T) {
 func TestConcurrentWrites(t *testing.T) {
 	dir := t.TempDir()
 
-	store, err := Open(dir, 16)
+	store, err := Open(dir, 16, 0)
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
@@ -362,7 +362,7 @@ func TestConcurrentWrites(t *testing.T) {
 func TestConcurrentReadWriteDelete(t *testing.T) {
 	dir := t.TempDir()
 
-	store, err := Open(dir, 16)
+	store, err := Open(dir, 16, 0)
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
@@ -399,7 +399,7 @@ func TestConcurrentReadWriteDelete(t *testing.T) {
 func TestCloseSyncs(t *testing.T) {
 	dir := t.TempDir()
 
-	store, err := Open(dir, 16)
+	store, err := Open(dir, 16, 0)
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
@@ -410,7 +410,7 @@ func TestCloseSyncs(t *testing.T) {
 		t.Fatalf("Close failed: %v", err)
 	}
 
-	store2, err := Open(dir, 16)
+	store2, err := Open(dir, 16, 0)
 	if err != nil {
 		t.Fatalf("Re-open failed: %v", err)
 	}
@@ -425,7 +425,7 @@ func TestCloseSyncs(t *testing.T) {
 func TestEmptyValue(t *testing.T) {
 	dir := t.TempDir()
 
-	store, err := Open(dir, 16)
+	store, err := Open(dir, 16, 0)
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
@@ -445,7 +445,7 @@ func TestEmptyValue(t *testing.T) {
 func TestBinaryValues(t *testing.T) {
 	dir := t.TempDir()
 
-	store, err := Open(dir, 16)
+	store, err := Open(dir, 16, 0)
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
@@ -467,7 +467,7 @@ func TestBinaryValues(t *testing.T) {
 func TestLargeValues(t *testing.T) {
 	dir := t.TempDir()
 
-	store, err := Open(dir, 16)
+	store, err := Open(dir, 16, 0)
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
@@ -497,7 +497,7 @@ func TestLargeValues(t *testing.T) {
 func TestManyKeysRecovery(t *testing.T) {
 	dir := t.TempDir()
 
-	store, err := Open(dir, 16)
+	store, err := Open(dir, 16, 0)
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
@@ -511,7 +511,7 @@ func TestManyKeysRecovery(t *testing.T) {
 		t.Fatalf("Close failed: %v", err)
 	}
 
-	store2, err := Open(dir, 16)
+	store2, err := Open(dir, 16, 0)
 	if err != nil {
 		t.Fatalf("Re-open failed: %v", err)
 	}
@@ -535,7 +535,7 @@ func TestManyKeysRecovery(t *testing.T) {
 func TestWALEntryFormat(t *testing.T) {
 	dir := t.TempDir()
 
-	store, err := Open(dir, 16)
+	store, err := Open(dir, 16, 0)
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
@@ -589,7 +589,7 @@ func TestWALEntryFormat(t *testing.T) {
 func TestDeleteWALEntryFormat(t *testing.T) {
 	dir := t.TempDir()
 
-	store, err := Open(dir, 16)
+	store, err := Open(dir, 16, 0)
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
@@ -639,7 +639,7 @@ func TestDeleteWALEntryFormat(t *testing.T) {
 func TestRecoveryWithMixedOps(t *testing.T) {
 	dir := t.TempDir()
 
-	store, err := Open(dir, 16)
+	store, err := Open(dir, 16, 0)
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
@@ -656,7 +656,7 @@ func TestRecoveryWithMixedOps(t *testing.T) {
 		t.Fatalf("Close failed: %v", err)
 	}
 
-	store2, err := Open(dir, 16)
+	store2, err := Open(dir, 16, 0)
 	if err != nil {
 		t.Fatalf("Re-open failed: %v", err)
 	}
@@ -689,7 +689,7 @@ func TestRecoveryWithMixedOps(t *testing.T) {
 func TestKeys(t *testing.T) {
 	dir := t.TempDir()
 
-	store, err := Open(dir, 16)
+	store, err := Open(dir, 16, 0)
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
@@ -720,7 +720,7 @@ func TestKeys(t *testing.T) {
 func BenchmarkStoreSet(b *testing.B) {
 	dir := b.TempDir()
 
-	store, err := Open(dir, 16)
+	store, err := Open(dir, 16, 0)
 	if err != nil {
 		b.Fatalf("Open failed: %v", err)
 	}
@@ -735,7 +735,7 @@ func BenchmarkStoreSet(b *testing.B) {
 func BenchmarkStoreGet(b *testing.B) {
 	dir := b.TempDir()
 
-	store, err := Open(dir, 16)
+	store, err := Open(dir, 16, 0)
 	if err != nil {
 		b.Fatalf("Open failed: %v", err)
 	}
@@ -754,7 +754,7 @@ func BenchmarkStoreGet(b *testing.B) {
 func BenchmarkStoreDelete(b *testing.B) {
 	dir := b.TempDir()
 
-	store, err := Open(dir, 16)
+	store, err := Open(dir, 16, 0)
 	if err != nil {
 		b.Fatalf("Open failed: %v", err)
 	}
@@ -774,7 +774,7 @@ func BenchmarkStoreDelete(b *testing.B) {
 func BenchmarkStoreSetGet(b *testing.B) {
 	dir := b.TempDir()
 
-	store, err := Open(dir, 16)
+	store, err := Open(dir, 16, 0)
 	if err != nil {
 		b.Fatalf("Open failed: %v", err)
 	}
@@ -790,7 +790,7 @@ func BenchmarkStoreSetGet(b *testing.B) {
 func BenchmarkStoreSetConcurrent(b *testing.B) {
 	dir := b.TempDir()
 
-	store, err := Open(dir, 16)
+	store, err := Open(dir, 16, 0)
 	if err != nil {
 		b.Fatalf("Open failed: %v", err)
 	}
@@ -809,7 +809,7 @@ func BenchmarkStoreSetConcurrent(b *testing.B) {
 func BenchmarkStoreGetConcurrent(b *testing.B) {
 	dir := b.TempDir()
 
-	store, err := Open(dir, 16)
+	store, err := Open(dir, 16, 0)
 	if err != nil {
 		b.Fatalf("Open failed: %v", err)
 	}
@@ -832,7 +832,7 @@ func BenchmarkStoreGetConcurrent(b *testing.B) {
 func BenchmarkStoreMixed(b *testing.B) {
 	dir := b.TempDir()
 
-	store, err := Open(dir, 16)
+	store, err := Open(dir, 16, 0)
 	if err != nil {
 		b.Fatalf("Open failed: %v", err)
 	}
@@ -859,7 +859,7 @@ func BenchmarkStoreMixed(b *testing.B) {
 func BenchmarkStoreOpenReplay(b *testing.B) {
 	dir := b.TempDir()
 
-	store, err := Open(dir, 16)
+	store, err := Open(dir, 16, 0)
 	if err != nil {
 		b.Fatalf("Open failed: %v", err)
 	}
@@ -871,7 +871,7 @@ func BenchmarkStoreOpenReplay(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		s, err := Open(dir, 16)
+		s, err := Open(dir, 16, 0)
 		if err != nil {
 			b.Fatalf("Open failed: %v", err)
 		}
@@ -882,7 +882,7 @@ func BenchmarkStoreOpenReplay(b *testing.B) {
 func BenchmarkStoreOpenReplay100K(b *testing.B) {
 	dir := b.TempDir()
 
-	store, err := Open(dir, 16)
+	store, err := Open(dir, 16, 0)
 	if err != nil {
 		b.Fatalf("Open failed: %v", err)
 	}
@@ -894,7 +894,7 @@ func BenchmarkStoreOpenReplay100K(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		s, err := Open(dir, 16)
+		s, err := Open(dir, 16, 0)
 		if err != nil {
 			b.Fatalf("Open failed: %v", err)
 		}
@@ -905,7 +905,7 @@ func BenchmarkStoreOpenReplay100K(b *testing.B) {
 func BenchmarkStoreLargeValue(b *testing.B) {
 	dir := b.TempDir()
 
-	store, err := Open(dir, 16)
+	store, err := Open(dir, 16, 0)
 	if err != nil {
 		b.Fatalf("Open failed: %v", err)
 	}
@@ -919,5 +919,454 @@ func BenchmarkStoreLargeValue(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		store.Set(fmt.Sprintf("key-%d", i), value)
+	}
+}
+
+// --- Snapshot Tests ---
+
+func TestSnapshotCreatesFile(t *testing.T) {
+	dir := t.TempDir()
+
+	store, err := Open(dir, 16, 0)
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+	defer store.Close()
+
+	store.Set("a", []byte("1"))
+	store.Set("b", []byte("2"))
+
+	if err := store.Snapshot(); err != nil {
+		t.Fatalf("Snapshot failed: %v", err)
+	}
+
+	snapshotPath := filepath.Join(dir, snapshotFileName)
+	if _, err := os.Stat(snapshotPath); os.IsNotExist(err) {
+		t.Fatal("snapshot.db was not created")
+	}
+}
+
+func TestSnapshotTruncatesWAL(t *testing.T) {
+	dir := t.TempDir()
+
+	store, err := Open(dir, 16, 0)
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+	defer store.Close()
+
+	store.Set("a", []byte("1"))
+	store.Set("b", []byte("2"))
+
+	walPath := filepath.Join(dir, walFileName)
+	if _, err := os.Stat(walPath); err != nil {
+		t.Fatalf("WAL stat failed: %v", err)
+	}
+
+	if err := store.Snapshot(); err != nil {
+		t.Fatalf("Snapshot failed: %v", err)
+	}
+
+	walAfter, _ := os.Stat(walPath)
+	if walAfter.Size() != 0 {
+		t.Fatalf("WAL size after snapshot = %d, want 0", walAfter.Size())
+	}
+}
+
+func TestRecoveryFromSnapshot(t *testing.T) {
+	dir := t.TempDir()
+
+	store, err := Open(dir, 16, 0)
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+
+	store.Set("name", []byte("Alice"))
+	store.Set("age", []byte("30"))
+	store.Set("city", []byte("Berlin"))
+
+	if err := store.Snapshot(); err != nil {
+		t.Fatalf("Snapshot failed: %v", err)
+	}
+
+	if err := store.Close(); err != nil {
+		t.Fatalf("Close failed: %v", err)
+	}
+
+	store2, err := Open(dir, 16, 0)
+	if err != nil {
+		t.Fatalf("Re-open failed: %v", err)
+	}
+	defer store2.Close()
+
+	if store2.Size() != 3 {
+		t.Fatalf("Recovered Size = %d, want 3", store2.Size())
+	}
+
+	for _, tc := range []struct {
+		key   string
+		want  string
+		found bool
+	}{
+		{"name", "Alice", true},
+		{"age", "30", true},
+		{"city", "Berlin", true},
+	} {
+		v, ok := store2.Get(tc.key)
+		if ok != tc.found {
+			t.Fatalf("Recovered Get(%q) found=%v, want %v", tc.key, ok, tc.found)
+		}
+		if ok && string(v) != tc.want {
+			t.Fatalf("Recovered Get(%q) = %q, want %q", tc.key, v, tc.want)
+		}
+	}
+}
+
+func TestRecoveryFromSnapshotPlusWAL(t *testing.T) {
+	dir := t.TempDir()
+
+	store, err := Open(dir, 16, 0)
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+
+	store.Set("a", []byte("1"))
+	store.Set("b", []byte("2"))
+
+	if err := store.Snapshot(); err != nil {
+		t.Fatalf("Snapshot failed: %v", err)
+	}
+
+	store.Set("c", []byte("3"))
+	store.Set("d", []byte("4"))
+	store.Delete("a")
+
+	if err := store.Close(); err != nil {
+		t.Fatalf("Close failed: %v", err)
+	}
+
+	store2, err := Open(dir, 16, 0)
+	if err != nil {
+		t.Fatalf("Re-open failed: %v", err)
+	}
+	defer store2.Close()
+
+	if store2.Size() != 3 {
+		t.Fatalf("Recovered Size = %d, want 3", store2.Size())
+	}
+
+	for _, tc := range []struct {
+		key   string
+		want  string
+		found bool
+	}{
+		{"a", "", false},
+		{"b", "2", true},
+		{"c", "3", true},
+		{"d", "4", true},
+	} {
+		v, ok := store2.Get(tc.key)
+		if ok != tc.found {
+			t.Fatalf("Recovered Get(%q) found=%v, want %v", tc.key, ok, tc.found)
+		}
+		if ok && string(v) != tc.want {
+			t.Fatalf("Recovered Get(%q) = %q, want %q", tc.key, v, tc.want)
+		}
+	}
+}
+
+func TestCorruptedSnapshot(t *testing.T) {
+	dir := t.TempDir()
+
+	store, err := Open(dir, 16, 0)
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+
+	store.Set("key", []byte("value"))
+
+	if err := store.Snapshot(); err != nil {
+		t.Fatalf("Snapshot failed: %v", err)
+	}
+
+	store.wal.Close()
+
+	snapshotPath := filepath.Join(dir, snapshotFileName)
+	data, err := os.ReadFile(snapshotPath)
+	if err != nil {
+		t.Fatalf("ReadFile failed: %v", err)
+	}
+
+	corrupted := make([]byte, len(data))
+	copy(corrupted, data)
+	corrupted[len(corrupted)-1] ^= 0xFF
+
+	if err := os.WriteFile(snapshotPath, corrupted, 0600); err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+
+	store2, err := Open(dir, 16, 0)
+	if err != nil {
+		t.Fatalf("Re-open after snapshot corruption failed: %v", err)
+	}
+	defer store2.Close()
+
+	if _, err := os.Stat(snapshotPath); !os.IsNotExist(err) {
+		t.Fatal("corrupt snapshot.db was not deleted")
+	}
+}
+
+func TestAutoSnapshot(t *testing.T) {
+	dir := t.TempDir()
+
+	store, err := Open(dir, 16, 10)
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+	defer store.Close()
+
+	for i := 0; i < 10; i++ {
+		store.Set(fmt.Sprintf("key-%d", i), []byte("value"))
+	}
+
+	snapshotPath := filepath.Join(dir, snapshotFileName)
+	if _, err := os.Stat(snapshotPath); os.IsNotExist(err) {
+		t.Fatal("auto-snapshot was not created after threshold")
+	}
+
+	if store.writesSinceSnapshot != 0 {
+		t.Fatalf("writesSinceSnapshot = %d, want 0 after auto-snapshot", store.writesSinceSnapshot)
+	}
+}
+
+func TestSnapshotCRCFormat(t *testing.T) {
+	dir := t.TempDir()
+
+	store, err := Open(dir, 16, 0)
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+
+	store.Set("test", []byte("data"))
+
+	if err := store.Snapshot(); err != nil {
+		t.Fatalf("Snapshot failed: %v", err)
+	}
+
+	store.Close()
+
+	snapshotPath := filepath.Join(dir, snapshotFileName)
+	data, err := os.ReadFile(snapshotPath)
+	if err != nil {
+		t.Fatalf("ReadFile failed: %v", err)
+	}
+
+	if len(data) < 4+4+4+4+4 {
+		t.Fatalf("snapshot too short: %d bytes", len(data))
+	}
+
+	numEntries := binary.BigEndian.Uint32(data[0:4])
+	if numEntries != 1 {
+		t.Fatalf("numEntries = %d, want 1", numEntries)
+	}
+
+	keyLen := binary.BigEndian.Uint32(data[4:8])
+	if keyLen != 4 {
+		t.Fatalf("keyLen = %d, want 4", keyLen)
+	}
+
+	key := data[8:12]
+	if string(key) != "test" {
+		t.Fatalf("key = %q, want test", key)
+	}
+
+	valLen := binary.BigEndian.Uint32(data[12:16])
+	if valLen != 4 {
+		t.Fatalf("valLen = %d, want 4", valLen)
+	}
+
+	value := data[16:20]
+	if string(value) != "data" {
+		t.Fatalf("value = %q, want data", value)
+	}
+
+	storedCRC := binary.BigEndian.Uint32(data[len(data)-4:])
+	computedCRC := crc32.ChecksumIEEE(data[:len(data)-4])
+	if storedCRC != computedCRC {
+		t.Fatalf("CRC mismatch: stored=0x%08x, computed=0x%08x", storedCRC, computedCRC)
+	}
+}
+
+func TestSnapshotWithManyEntries(t *testing.T) {
+	dir := t.TempDir()
+
+	store, err := Open(dir, 16, 0)
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+
+	const n = 5000
+	for i := 0; i < n; i++ {
+		store.Set(fmt.Sprintf("key-%d", i), []byte(fmt.Sprintf("value-%d", i)))
+	}
+
+	if err := store.Snapshot(); err != nil {
+		t.Fatalf("Snapshot failed: %v", err)
+	}
+
+	if err := store.Close(); err != nil {
+		t.Fatalf("Close failed: %v", err)
+	}
+
+	store2, err := Open(dir, 16, 0)
+	if err != nil {
+		t.Fatalf("Re-open failed: %v", err)
+	}
+	defer store2.Close()
+
+	if store2.Size() != n {
+		t.Fatalf("Recovered Size = %d, want %d", store2.Size(), n)
+	}
+
+	for i := 0; i < n; i++ {
+		v, ok := store2.Get(fmt.Sprintf("key-%d", i))
+		if !ok || string(v) != fmt.Sprintf("value-%d", i) {
+			t.Fatalf("Get(key-%d) = %q, %v; want value-%d, true", i, v, ok, i)
+		}
+	}
+}
+
+func TestSnapshotEmptyStore(t *testing.T) {
+	dir := t.TempDir()
+
+	store, err := Open(dir, 16, 0)
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+
+	if err := store.Snapshot(); err != nil {
+		t.Fatalf("Snapshot of empty store failed: %v", err)
+	}
+
+	store.Close()
+
+	store2, err := Open(dir, 16, 0)
+	if err != nil {
+		t.Fatalf("Re-open failed: %v", err)
+	}
+	defer store2.Close()
+
+	if store2.Size() != 0 {
+		t.Fatalf("Recovered Size = %d, want 0", store2.Size())
+	}
+}
+
+func TestSnapshotAndDelete(t *testing.T) {
+	dir := t.TempDir()
+
+	store, err := Open(dir, 16, 0)
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+
+	store.Set("a", []byte("1"))
+	store.Set("b", []byte("2"))
+
+	if err := store.Snapshot(); err != nil {
+		t.Fatalf("Snapshot failed: %v", err)
+	}
+
+	store.Delete("a")
+	store.Set("c", []byte("3"))
+
+	if err := store.Close(); err != nil {
+		t.Fatalf("Close failed: %v", err)
+	}
+
+	store2, err := Open(dir, 16, 0)
+	if err != nil {
+		t.Fatalf("Re-open failed: %v", err)
+	}
+	defer store2.Close()
+
+	if store2.Size() != 2 {
+		t.Fatalf("Recovered Size = %d, want 2", store2.Size())
+	}
+
+	if _, ok := store2.Get("a"); ok {
+		t.Fatal("Get(a) = true, want false (was deleted after snapshot)")
+	}
+
+	v, ok := store2.Get("c")
+	if !ok || string(v) != "3" {
+		t.Fatalf("Get(c) = %q, %v; want 3, true", v, ok)
+	}
+}
+
+// --- Snapshot Benchmarks ---
+
+func BenchmarkSnapshot(b *testing.B) {
+	dir := b.TempDir()
+
+	store, err := Open(dir, 16, 0)
+	if err != nil {
+		b.Fatalf("Open failed: %v", err)
+	}
+	defer store.Close()
+
+	for i := 0; i < 10000; i++ {
+		store.Set(fmt.Sprintf("key-%d", i), []byte("value"))
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if err := store.Snapshot(); err != nil {
+			b.Fatalf("Snapshot failed: %v", err)
+		}
+	}
+}
+
+func BenchmarkSnapshot100K(b *testing.B) {
+	dir := b.TempDir()
+
+	store, err := Open(dir, 16, 0)
+	if err != nil {
+		b.Fatalf("Open failed: %v", err)
+	}
+	defer store.Close()
+
+	for i := 0; i < 100000; i++ {
+		store.Set(fmt.Sprintf("key-%d", i), []byte("value"))
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if err := store.Snapshot(); err != nil {
+			b.Fatalf("Snapshot failed: %v", err)
+		}
+	}
+}
+
+func BenchmarkOpenWithSnapshot(b *testing.B) {
+	dir := b.TempDir()
+
+	store, err := Open(dir, 16, 0)
+	if err != nil {
+		b.Fatalf("Open failed: %v", err)
+	}
+
+	for i := 0; i < 10000; i++ {
+		store.Set(fmt.Sprintf("key-%d", i), []byte("value"))
+	}
+	store.Snapshot()
+	store.Close()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		s, err := Open(dir, 16, 0)
+		if err != nil {
+			b.Fatalf("Open failed: %v", err)
+		}
+		s.Close()
 	}
 }
