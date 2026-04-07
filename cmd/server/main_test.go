@@ -7,13 +7,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
 	"shelf"
 )
 
-func newTestServer(t *testing.T) (*Server, func()) {
+func newTestServer(t testing.TB) (*Server, func()) {
 	t.Helper()
 	dir := t.TempDir()
 
@@ -573,6 +572,159 @@ func TestConcurrentHTTPRequests(t *testing.T) {
 	}
 }
 
-func TestMain(m *testing.M) {
-	os.Exit(m.Run())
+func BenchmarkHTTPPut(b *testing.B) {
+	srv, cleanup := newTestServer(b)
+	defer cleanup()
+
+	encoded := base64.StdEncoding.EncodeToString([]byte("value"))
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		doRequest(srv, http.MethodPut, "/keys/bench-key", map[string]string{"value": encoded})
+	}
+}
+
+func BenchmarkHTTPGet(b *testing.B) {
+	srv, cleanup := newTestServer(b)
+	defer cleanup()
+
+	srv.store.Set("bench-key", []byte("value"))
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		doRequest(srv, http.MethodGet, "/keys/bench-key", nil)
+	}
+}
+
+func BenchmarkHTTPGetMiss(b *testing.B) {
+	srv, cleanup := newTestServer(b)
+	defer cleanup()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		doRequest(srv, http.MethodGet, "/keys/missing-key", nil)
+	}
+}
+
+func BenchmarkHTTPDelete(b *testing.B) {
+	srv, cleanup := newTestServer(b)
+	defer cleanup()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		srv.store.Set(fmt.Sprintf("del-%d", i), []byte("value"))
+		doRequest(srv, http.MethodDelete, "/keys/del-"+fmt.Sprint(i), nil)
+	}
+}
+
+func BenchmarkHTTPMixed(b *testing.B) {
+	srv, cleanup := newTestServer(b)
+	defer cleanup()
+
+	encoded := base64.StdEncoding.EncodeToString([]byte("value"))
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		key := fmt.Sprintf("key-%d", i%100)
+		switch i % 5 {
+		case 0, 1:
+			doRequest(srv, http.MethodPut, "/keys/"+key, map[string]string{"value": encoded})
+		case 2, 3, 4:
+			doRequest(srv, http.MethodGet, "/keys/"+key, nil)
+		}
+	}
+}
+
+func BenchmarkHTTPHealth(b *testing.B) {
+	srv, cleanup := newTestServer(b)
+	defer cleanup()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		doRequest(srv, http.MethodGet, "/health", nil)
+	}
+}
+
+func BenchmarkHTTPSize(b *testing.B) {
+	srv, cleanup := newTestServer(b)
+	defer cleanup()
+
+	for i := 0; i < 10000; i++ {
+		srv.store.Set(fmt.Sprintf("key-%d", i), []byte("value"))
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		doRequest(srv, http.MethodGet, "/size", nil)
+	}
+}
+
+func BenchmarkHTTPListKeys(b *testing.B) {
+	srv, cleanup := newTestServer(b)
+	defer cleanup()
+
+	for i := 0; i < 10000; i++ {
+		srv.store.Set(fmt.Sprintf("key-%d", i), []byte("value"))
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		doRequest(srv, http.MethodGet, "/keys", nil)
+	}
+}
+
+func BenchmarkHTTPConcurrentPut(b *testing.B) {
+	srv, cleanup := newTestServer(b)
+	defer cleanup()
+
+	encoded := base64.StdEncoding.EncodeToString([]byte("value"))
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		i := 0
+		for pb.Next() {
+			doRequest(srv, http.MethodPut, "/keys/bench-key-"+fmt.Sprint(i), map[string]string{"value": encoded})
+			i++
+		}
+	})
+}
+
+func BenchmarkHTTPConcurrentGet(b *testing.B) {
+	srv, cleanup := newTestServer(b)
+	defer cleanup()
+
+	for i := 0; i < 10000; i++ {
+		srv.store.Set(fmt.Sprintf("key-%d", i), []byte("value"))
+	}
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		i := 0
+		for pb.Next() {
+			doRequest(srv, http.MethodGet, "/keys/key-"+fmt.Sprint(i%10000), nil)
+			i++
+		}
+	})
+}
+
+func BenchmarkHTTPConcurrentMixed(b *testing.B) {
+	srv, cleanup := newTestServer(b)
+	defer cleanup()
+
+	encoded := base64.StdEncoding.EncodeToString([]byte("value"))
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		i := 0
+		for pb.Next() {
+			key := fmt.Sprintf("key-%d", i%1000)
+			switch i % 5 {
+			case 0, 1:
+				doRequest(srv, http.MethodPut, "/keys/"+key, map[string]string{"value": encoded})
+			case 2, 3, 4:
+				doRequest(srv, http.MethodGet, "/keys/"+key, nil)
+			}
+			i++
+		}
+	})
 }
