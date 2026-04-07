@@ -1,0 +1,24 @@
+# Binaries
+shelf
+server
+collector
+query
+
+# Data directories
+shelf.db/
+*.db/
+metrics.log
+
+# Temp files
+*.tmp
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
