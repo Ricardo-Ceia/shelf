@@ -18,15 +18,25 @@ import (
 )
 
 type Server struct {
-	store *shelf.Store
+	store    *shelf.Store
+	registry *shelf.Registry
+	total    *shelf.Counter
+	duration *shelf.Histogram
 }
 
-func NewServer(store *shelf.Store) *Server {
-	return &Server{store: store}
+func NewServer(store *shelf.Store, registry *shelf.Registry) *Server {
+	return &Server{
+		store:    store,
+		registry: registry,
+		total:    registry.Counter("shelf_http_requests_total"),
+		duration: registry.Histogram("shelf_http_request_duration_seconds", []float64{0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0}),
+	}
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
+	case r.URL.Path == "/metrics" && r.Method == http.MethodGet:
+		s.handleMetrics(w)
 	case r.URL.Path == "/health" && r.Method == http.MethodGet:
 		s.handleHealth(w)
 	case r.URL.Path == "/size" && r.Method == http.MethodGet:
@@ -38,6 +48,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.NotFound(w, r)
 	}
+}
+
+func (s *Server) handleMetrics(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+	s.registry.WriteTo(w, s.store)
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter) {
@@ -132,11 +147,26 @@ func writeError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, map[string]string{"error": message})
 }
 
-func loggingMiddleware(next http.Handler) http.Handler {
+type responseWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (rw *responseWriter) WriteHeader(code int) {
+	rw.status = code
+	rw.ResponseWriter.WriteHeader(code)
+}
+
+func metricsMiddleware(next http.Handler, total *shelf.Counter, duration *shelf.Histogram) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		next.ServeHTTP(w, r)
-		log.Printf("%s %s %s", r.Method, r.URL.Path, time.Since(start))
+		rw := &responseWriter{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(rw, r)
+		elapsed := time.Since(start).Seconds()
+
+		total.Inc()
+		duration.Observe(elapsed)
+		log.Printf("%s %s %d %s", r.Method, r.URL.Path, rw.status, time.Since(start))
 	})
 }
 
@@ -152,8 +182,9 @@ func main() {
 		log.Fatalf("failed to open store: %v", err)
 	}
 
-	server := NewServer(store)
-	handler := loggingMiddleware(server)
+	registry := shelf.NewRegistry()
+	server := NewServer(store, registry)
+	handler := metricsMiddleware(server, registry.Counter("shelf_http_requests_total"), registry.Histogram("shelf_http_request_duration_seconds", []float64{0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0}))
 
 	httpServer := &http.Server{
 		Addr:    *addr,

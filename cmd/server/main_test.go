@@ -21,8 +21,9 @@ func newTestServer(t testing.TB) (*Server, func()) {
 		t.Fatalf("Open failed: %v", err)
 	}
 
+	registry := shelf.NewRegistry()
 	cleanup := func() { store.Close() }
-	return NewServer(store), cleanup
+	return NewServer(store, registry), cleanup
 }
 
 func doRequest(srv *Server, method, path string, body any) (*httptest.ResponseRecorder, error) {
@@ -497,7 +498,8 @@ func TestPersistenceAcrossRestart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open 1 failed: %v", err)
 	}
-	srv1 := NewServer(store1)
+	registry1 := shelf.NewRegistry()
+	srv1 := NewServer(store1, registry1)
 
 	encoded := base64.StdEncoding.EncodeToString([]byte("persistent"))
 	w, err := doRequest(srv1, http.MethodPut, "/keys/data", map[string]string{"value": encoded})
@@ -515,7 +517,8 @@ func TestPersistenceAcrossRestart(t *testing.T) {
 		t.Fatalf("Open 2 failed: %v", err)
 	}
 	defer store2.Close()
-	srv2 := NewServer(store2)
+	registry2 := shelf.NewRegistry()
+	srv2 := NewServer(store2, registry2)
 
 	w, err = doRequest(srv2, http.MethodGet, "/keys/data", nil)
 	if err != nil {
