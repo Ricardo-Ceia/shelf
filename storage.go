@@ -202,23 +202,14 @@ func (s *Store) Set(key string, value []byte) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	entry := make([]byte, 1+4+len(key)+4+len(value)+4)
-	entry[0] = byte(opSet)
-	binary.BigEndian.PutUint32(entry[1:5], uint32(len(key)))
-	copy(entry[5:5+len(key)], key)
-	binary.BigEndian.PutUint32(entry[5+len(key):9+len(key)], uint32(len(value)))
-	copy(entry[9+len(key):9+len(key)+len(value)], value)
-	crc := crc32.ChecksumIEEE(entry[:9+len(key)+len(value)])
-	binary.BigEndian.PutUint32(entry[9+len(key)+len(value):], crc)
-
+	entry := encodeWALEntry(opSet, key, value)
 	if _, err := s.wal.Write(entry); err != nil {
 		return fmt.Errorf("write WAL: %w", err)
 	}
 
 	s.ht.Insert(key, value)
-
 	s.writesSinceSnapshot++
-	if s.snapshotThreshold > 0 && s.writesSinceSnapshot >= s.snapshotThreshold {
+	if s.shouldSnapshot() {
 		if err := s.snapshotLocked(); err != nil {
 			return fmt.Errorf("auto-snapshot: %w", err)
 		}
@@ -235,22 +226,14 @@ func (s *Store) Delete(key string) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	entry := make([]byte, 1+4+len(key)+4+0+4)
-	entry[0] = byte(opDel)
-	binary.BigEndian.PutUint32(entry[1:5], uint32(len(key)))
-	copy(entry[5:5+len(key)], key)
-	binary.BigEndian.PutUint32(entry[5+len(key):9+len(key)], 0)
-	crc := crc32.ChecksumIEEE(entry[:9+len(key)])
-	binary.BigEndian.PutUint32(entry[9+len(key):], crc)
-
+	entry := encodeWALEntry(opDel, key, nil)
 	if _, err := s.wal.Write(entry); err != nil {
 		return false, fmt.Errorf("write WAL: %w", err)
 	}
 
 	existed := s.ht.Delete(key)
-
 	s.writesSinceSnapshot++
-	if s.snapshotThreshold > 0 && s.writesSinceSnapshot >= s.snapshotThreshold {
+	if s.shouldSnapshot() {
 		if err := s.snapshotLocked(); err != nil {
 			return existed, fmt.Errorf("auto-snapshot: %w", err)
 		}
@@ -282,50 +265,10 @@ func (s *Store) snapshotLocked() error {
 		return fmt.Errorf("create snapshot temp file: %w", err)
 	}
 
-	crcHash := crc32.NewIEEE()
-	mw := io.MultiWriter(f, crcHash)
-
-	keys := s.ht.Keys()
-	numEntries := uint32(len(keys))
-
-	header := make([]byte, 4)
-	binary.BigEndian.PutUint32(header, numEntries)
-
-	if _, err := mw.Write(header); err != nil {
+	if err := s.writeSnapshot(f); err != nil {
 		f.Close()
 		os.Remove(tmpPath)
-		return fmt.Errorf("write snapshot header: %w", err)
-	}
-
-	for _, key := range keys {
-		value, _ := s.ht.Get(key)
-
-		keyLen := uint32(len(key))
-		valLen := uint32(len(value))
-
-		entryBuf := make([]byte, 4+int(keyLen)+4+int(valLen))
-		binary.BigEndian.PutUint32(entryBuf[0:4], keyLen)
-		copy(entryBuf[4:4+int(keyLen)], key)
-		binary.BigEndian.PutUint32(entryBuf[4+int(keyLen):8+int(keyLen)], valLen)
-		if valLen > 0 {
-			copy(entryBuf[8+int(keyLen):], value)
-		}
-
-		if _, err := mw.Write(entryBuf); err != nil {
-			f.Close()
-			os.Remove(tmpPath)
-			return fmt.Errorf("write snapshot entry: %w", err)
-		}
-	}
-
-	crc := crcHash.Sum32()
-	crcBytes := make([]byte, 4)
-	binary.BigEndian.PutUint32(crcBytes, crc)
-
-	if _, err := f.Write(crcBytes); err != nil {
-		f.Close()
-		os.Remove(tmpPath)
-		return fmt.Errorf("write snapshot CRC: %w", err)
+		return err
 	}
 
 	if err := f.Sync(); err != nil {
@@ -353,7 +296,6 @@ func (s *Store) snapshotLocked() error {
 	}
 
 	s.writesSinceSnapshot = 0
-
 	return nil
 }
 
@@ -362,4 +304,60 @@ func (s *Store) Close() error {
 		return fmt.Errorf("sync WAL: %w", err)
 	}
 	return s.wal.Close()
+}
+
+func (s *Store) shouldSnapshot() bool {
+	return s.snapshotThreshold > 0 && s.writesSinceSnapshot >= s.snapshotThreshold
+}
+
+func encodeWALEntry(op opCode, key string, value []byte) []byte {
+	valLen := len(value)
+	entry := make([]byte, 1+4+len(key)+4+valLen+4)
+	entry[0] = byte(op)
+	binary.BigEndian.PutUint32(entry[1:5], uint32(len(key)))
+	copy(entry[5:], key)
+	binary.BigEndian.PutUint32(entry[5+len(key):], uint32(valLen))
+	if valLen > 0 {
+		copy(entry[9+len(key):], value)
+	}
+	crc := crc32.ChecksumIEEE(entry[:9+len(key)+valLen])
+	binary.BigEndian.PutUint32(entry[9+len(key)+valLen:], crc)
+	return entry
+}
+
+func (s *Store) writeSnapshot(f *os.File) error {
+	crcHash := crc32.NewIEEE()
+	mw := io.MultiWriter(f, crcHash)
+
+	keys := s.ht.Keys()
+	header := make([]byte, 4)
+	binary.BigEndian.PutUint32(header, uint32(len(keys)))
+
+	if _, err := mw.Write(header); err != nil {
+		return fmt.Errorf("write snapshot header: %w", err)
+	}
+
+	for _, key := range keys {
+		value, _ := s.ht.Get(key)
+		entryBuf := make([]byte, 4+len(key)+4+len(value))
+		binary.BigEndian.PutUint32(entryBuf[0:4], uint32(len(key)))
+		copy(entryBuf[4:], key)
+		binary.BigEndian.PutUint32(entryBuf[4+len(key):], uint32(len(value)))
+		if len(value) > 0 {
+			copy(entryBuf[8+len(key):], value)
+		}
+		if _, err := mw.Write(entryBuf); err != nil {
+			return fmt.Errorf("write snapshot entry: %w", err)
+		}
+	}
+
+	crc := crcHash.Sum32()
+	crcBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(crcBytes, crc)
+
+	if _, err := f.Write(crcBytes); err != nil {
+		return fmt.Errorf("write snapshot CRC: %w", err)
+	}
+
+	return nil
 }

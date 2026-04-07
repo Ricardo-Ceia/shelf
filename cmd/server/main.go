@@ -33,6 +33,10 @@ func NewServer(store *shelf.Store, registry *shelf.Registry) *Server {
 	}
 }
 
+func (s *Server) Metrics() (*shelf.Counter, *shelf.Histogram) {
+	return s.total, s.duration
+}
+
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.URL.Path == "/metrics" && r.Method == http.MethodGet:
@@ -149,12 +153,24 @@ func writeError(w http.ResponseWriter, status int, message string) {
 
 type responseWriter struct {
 	http.ResponseWriter
-	status int
+	wroteHeader bool
+	status      int
 }
 
 func (rw *responseWriter) WriteHeader(code int) {
+	if rw.wroteHeader {
+		return
+	}
+	rw.wroteHeader = true
 	rw.status = code
 	rw.ResponseWriter.WriteHeader(code)
+}
+
+func (rw *responseWriter) Write(b []byte) (int, error) {
+	if !rw.wroteHeader {
+		rw.WriteHeader(http.StatusOK)
+	}
+	return rw.ResponseWriter.Write(b)
 }
 
 func metricsMiddleware(next http.Handler, total *shelf.Counter, duration *shelf.Histogram) http.Handler {
@@ -184,7 +200,8 @@ func main() {
 
 	registry := shelf.NewRegistry()
 	server := NewServer(store, registry)
-	handler := metricsMiddleware(server, registry.Counter("shelf_http_requests_total"), registry.Histogram("shelf_http_request_duration_seconds", []float64{0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0}))
+	total, duration := server.Metrics()
+	handler := metricsMiddleware(server, total, duration)
 
 	httpServer := &http.Server{
 		Addr:    *addr,
