@@ -270,11 +270,26 @@ shelf/
       main.go          # Quick demo
 ```
 
+## Development
+
+```bash
+make build           # Build all binaries
+make test            # Run all tests with race detector
+make bench           # Run all benchmarks
+make lint            # Run go vet
+make clean           # Remove build artifacts
+make run-server      # Start the KV store server
+make run-collector   # Start the metrics collector
+make run-query       # Start the query API
+make run-demo        # Run the quick demo
+make help            # Show all targets
+```
+
 ## Testing
 
 ```bash
 # All tests with race detector
-go test -race ./...
+make test
 
 # Integration test (full pipeline)
 bash integration_test.sh
