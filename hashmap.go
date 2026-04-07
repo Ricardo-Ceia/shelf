@@ -34,7 +34,7 @@ func newShard[K comparable, V any](numBuckets int) *Shard[K, V] {
 	}
 	buckets := make([]*Bucket[K, V], numBuckets)
 	for i := 0; i < numBuckets; i++ {
-		buckets[i] = NewBucket[K, V]()
+		buckets[i] = newBucket[K, V]()
 	}
 	return &Shard[K, V]{
 		numBuckets: numBuckets,
@@ -43,7 +43,7 @@ func newShard[K comparable, V any](numBuckets int) *Shard[K, V] {
 	}
 }
 
-func NewBucket[K comparable, V any]() *Bucket[K, V] {
+func newBucket[K comparable, V any]() *Bucket[K, V] {
 	return &Bucket[K, V]{
 		entries: list.New(),
 	}
@@ -107,7 +107,7 @@ func (ht *HashTable[K, V]) resize(shard *Shard[K, V]) {
 	newNumBuckets := shard.numBuckets * 2
 	newBuckets := make([]*Bucket[K, V], newNumBuckets)
 	for i := 0; i < newNumBuckets; i++ {
-		newBuckets[i] = NewBucket[K, V]()
+		newBuckets[i] = newBucket[K, V]()
 	}
 
 	for _, bucket := range shard.buckets {
