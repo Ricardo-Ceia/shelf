@@ -1,13 +1,18 @@
 package main
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
+	"time"
 
 	"shelf"
 )
@@ -21,11 +26,37 @@ func NewServer(store *shelf.Store) *Server {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if !strings.HasPrefix(r.URL.Path, "/keys/") {
+	switch {
+	case r.URL.Path == "/health" && r.Method == http.MethodGet:
+		s.handleHealth(w)
+	case r.URL.Path == "/size" && r.Method == http.MethodGet:
+		s.handleSize(w)
+	case r.URL.Path == "/keys" && r.Method == http.MethodGet:
+		s.handleListKeys(w)
+	case strings.HasPrefix(r.URL.Path, "/keys/"):
+		s.handleKey(w, r)
+	default:
 		http.NotFound(w, r)
-		return
 	}
+}
 
+func (s *Server) handleHealth(w http.ResponseWriter) {
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (s *Server) handleSize(w http.ResponseWriter) {
+	writeJSON(w, http.StatusOK, map[string]int{"size": s.store.Size()})
+}
+
+func (s *Server) handleListKeys(w http.ResponseWriter) {
+	keys := s.store.Keys()
+	if keys == nil {
+		keys = []string{}
+	}
+	writeJSON(w, http.StatusOK, keys)
+}
+
+func (s *Server) handleKey(w http.ResponseWriter, r *http.Request) {
 	key := strings.TrimPrefix(r.URL.Path, "/keys/")
 	if key == "" {
 		writeError(w, http.StatusBadRequest, "key is required")
@@ -101,6 +132,14 @@ func writeError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, map[string]string{"error": message})
 }
 
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		next.ServeHTTP(w, r)
+		log.Printf("%s %s %s", r.Method, r.URL.Path, time.Since(start))
+	})
+}
+
 func main() {
 	addr := flag.String("addr", ":8080", "listen address")
 	dataDir := flag.String("data", "./shelf.db", "data directory")
@@ -114,11 +153,36 @@ func main() {
 	}
 
 	server := NewServer(store)
+	handler := loggingMiddleware(server)
 
-	fmt.Printf("shelf listening on %s (data=%s, shards=%d, snapshot=%d)\n",
-		*addr, *dataDir, *shards, *snapshotThreshold)
-
-	if err := http.ListenAndServe(*addr, server); err != nil {
-		log.Fatal(err)
+	httpServer := &http.Server{
+		Addr:    *addr,
+		Handler: handler,
 	}
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		fmt.Printf("shelf listening on %s (data=%s, shards=%d, snapshot=%d)\n",
+			*addr, *dataDir, *shards, *snapshotThreshold)
+		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal(err)
+		}
+	}()
+
+	<-stop
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := httpServer.Shutdown(ctx); err != nil {
+		log.Printf("server shutdown error: %v", err)
+	}
+
+	if err := store.Close(); err != nil {
+		log.Printf("store close error: %v", err)
+	}
+
+	fmt.Println("shelf stopped")
 }

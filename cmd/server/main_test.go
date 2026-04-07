@@ -258,6 +258,158 @@ func TestUnknownPath(t *testing.T) {
 	}
 }
 
+func TestHealth(t *testing.T) {
+	srv, cleanup := newTestServer(t)
+	defer cleanup()
+
+	w, err := doRequest(srv, http.MethodGet, "/health", nil)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET /health status = %d, want %d", w.Code, http.StatusOK)
+	}
+
+	var resp map[string]string
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+
+	if resp["status"] != "ok" {
+		t.Fatalf("status = %q, want ok", resp["status"])
+	}
+}
+
+func TestHealthWrongMethod(t *testing.T) {
+	srv, cleanup := newTestServer(t)
+	defer cleanup()
+
+	w, err := doRequest(srv, http.MethodPost, "/health", nil)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("POST /health status = %d, want %d", w.Code, http.StatusNotFound)
+	}
+}
+
+func TestSize(t *testing.T) {
+	srv, cleanup := newTestServer(t)
+	defer cleanup()
+
+	srv.store.Set("a", []byte("1"))
+	srv.store.Set("b", []byte("2"))
+
+	w, err := doRequest(srv, http.MethodGet, "/size", nil)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET /size status = %d, want %d", w.Code, http.StatusOK)
+	}
+
+	var resp map[string]int
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+
+	if resp["size"] != 2 {
+		t.Fatalf("size = %d, want 2", resp["size"])
+	}
+}
+
+func TestSizeEmpty(t *testing.T) {
+	srv, cleanup := newTestServer(t)
+	defer cleanup()
+
+	w, err := doRequest(srv, http.MethodGet, "/size", nil)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+
+	var resp map[string]int
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+
+	if resp["size"] != 0 {
+		t.Fatalf("size = %d, want 0", resp["size"])
+	}
+}
+
+func TestListKeys(t *testing.T) {
+	srv, cleanup := newTestServer(t)
+	defer cleanup()
+
+	srv.store.Set("a", []byte("1"))
+	srv.store.Set("b", []byte("2"))
+	srv.store.Set("c", []byte("3"))
+
+	w, err := doRequest(srv, http.MethodGet, "/keys", nil)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET /keys status = %d, want %d", w.Code, http.StatusOK)
+	}
+
+	var keys []string
+	if err := json.Unmarshal(w.Body.Bytes(), &keys); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+
+	if len(keys) != 3 {
+		t.Fatalf("keys count = %d, want 3", len(keys))
+	}
+
+	keySet := make(map[string]bool)
+	for _, k := range keys {
+		keySet[k] = true
+	}
+	for _, want := range []string{"a", "b", "c"} {
+		if !keySet[want] {
+			t.Fatalf("keys missing %q", want)
+		}
+	}
+}
+
+func TestListKeysEmpty(t *testing.T) {
+	srv, cleanup := newTestServer(t)
+	defer cleanup()
+
+	w, err := doRequest(srv, http.MethodGet, "/keys", nil)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+
+	var keys []string
+	if err := json.Unmarshal(w.Body.Bytes(), &keys); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+
+	if len(keys) != 0 {
+		t.Fatalf("keys count = %d, want 0", len(keys))
+	}
+}
+
+func TestListKeysWrongMethod(t *testing.T) {
+	srv, cleanup := newTestServer(t)
+	defer cleanup()
+
+	w, err := doRequest(srv, http.MethodPost, "/keys", nil)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("POST /keys status = %d, want %d", w.Code, http.StatusNotFound)
+	}
+}
+
 func TestUnknownMethod(t *testing.T) {
 	srv, cleanup := newTestServer(t)
 	defer cleanup()
