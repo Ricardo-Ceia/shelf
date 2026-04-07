@@ -515,3 +515,43 @@ func BenchmarkConcurrentThroughput(b *testing.B) {
 		})
 	}
 }
+
+func BenchmarkHashKey(b *testing.B) {
+	b.Run("string", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			hashKey("test-key-string")
+		}
+	})
+	b.Run("int", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			hashKey(42)
+		}
+	})
+	b.Run("int64", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			hashKey(int64(42))
+		}
+	})
+	b.Run("uint64", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			hashKey(uint64(42))
+		}
+	})
+	b.Run("float64", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			hashKey(3.14)
+		}
+	})
+	b.Run("bool", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			hashKey(true)
+		}
+	})
+	b.Run("struct", func(b *testing.B) {
+		type key struct{ A, B int }
+		k := key{A: 1, B: 2}
+		for i := 0; i < b.N; i++ {
+			hashKey(k)
+		}
+	})
+}

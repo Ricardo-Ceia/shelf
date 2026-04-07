@@ -2,6 +2,7 @@ package shelf
 
 import (
 	"container/list"
+	"encoding/binary"
 	"fmt"
 	"hash/fnv"
 	"sync"
@@ -69,7 +70,42 @@ func (ht *HashTable[K, V]) shardIndex(key K) int {
 
 func hashKey[K comparable](key K) uint64 {
 	h := fnv.New64a()
-	fmt.Fprint(h, key)
+	switch v := any(key).(type) {
+	case string:
+		h.Write([]byte(v))
+	case int:
+		b := [8]byte{}
+		binary.LittleEndian.PutUint64(b[:], uint64(v))
+		h.Write(b[:])
+	case int64:
+		b := [8]byte{}
+		binary.LittleEndian.PutUint64(b[:], uint64(v))
+		h.Write(b[:])
+	case uint64:
+		b := [8]byte{}
+		binary.LittleEndian.PutUint64(b[:], v)
+		h.Write(b[:])
+	case int32:
+		b := [4]byte{}
+		binary.LittleEndian.PutUint32(b[:], uint32(v))
+		h.Write(b[:])
+	case uint32:
+		b := [4]byte{}
+		binary.LittleEndian.PutUint32(b[:], v)
+		h.Write(b[:])
+	case float64:
+		b := [8]byte{}
+		binary.LittleEndian.PutUint64(b[:], uint64(v))
+		h.Write(b[:])
+	case bool:
+		if v {
+			h.Write([]byte{1})
+		} else {
+			h.Write([]byte{0})
+		}
+	default:
+		fmt.Fprint(h, key)
+	}
 	return h.Sum64()
 }
 
