@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"hash/crc32"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -281,13 +282,16 @@ func (s *Store) snapshotLocked() error {
 		return fmt.Errorf("create snapshot temp file: %w", err)
 	}
 
+	crcHash := crc32.NewIEEE()
+	mw := io.MultiWriter(f, crcHash)
+
 	keys := s.ht.Keys()
 	numEntries := uint32(len(keys))
 
 	header := make([]byte, 4)
 	binary.BigEndian.PutUint32(header, numEntries)
 
-	if _, err := f.Write(header); err != nil {
+	if _, err := mw.Write(header); err != nil {
 		f.Close()
 		os.Remove(tmpPath)
 		return fmt.Errorf("write snapshot header: %w", err)
@@ -307,21 +311,14 @@ func (s *Store) snapshotLocked() error {
 			copy(entryBuf[8+int(keyLen):], value)
 		}
 
-		if _, err := f.Write(entryBuf); err != nil {
+		if _, err := mw.Write(entryBuf); err != nil {
 			f.Close()
 			os.Remove(tmpPath)
 			return fmt.Errorf("write snapshot entry: %w", err)
 		}
 	}
 
-	data, err := os.ReadFile(tmpPath)
-	if err != nil {
-		f.Close()
-		os.Remove(tmpPath)
-		return fmt.Errorf("read snapshot for CRC: %w", err)
-	}
-
-	crc := crc32.ChecksumIEEE(data)
+	crc := crcHash.Sum32()
 	crcBytes := make([]byte, 4)
 	binary.BigEndian.PutUint32(crcBytes, crc)
 
