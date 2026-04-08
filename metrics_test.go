@@ -188,12 +188,21 @@ func TestRegistryWriteToWithStore(t *testing.T) {
 	}
 }
 
-func TestRegistryWriteToEmpty(t *testing.T) {
+func TestRegistryWriteToIncludesRuntimeMetrics(t *testing.T) {
 	r := NewRegistry()
 	var buf bytes.Buffer
 	r.WriteTo(&buf, nil)
 
-	if buf.Len() != 0 {
-		t.Fatalf("empty registry produced output: %q", buf.String())
+	output := buf.String()
+	expectedMetrics := []string{
+		"go_memstats_alloc_bytes",
+		"go_memstats_sys_bytes",
+		"go_goroutines",
+	}
+
+	for _, metric := range expectedMetrics {
+		if !strings.Contains(output, metric) {
+			t.Errorf("expected metrics output to contain %q, got:\n%s", metric, output)
+		}
 	}
 }

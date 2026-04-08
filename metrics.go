@@ -3,6 +3,7 @@ package shelf
 import (
 	"fmt"
 	"io"
+	"runtime"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -169,4 +170,11 @@ func (r *Registry) WriteTo(w io.Writer, store *Store) {
 		fmt.Fprintf(w, "%s_count %d\n", name, h.count)
 		h.mu.Unlock()
 	}
+
+	var mem runtime.MemStats
+	runtime.ReadMemStats(&mem)
+
+	fmt.Fprintf(w, "# TYPE go_memstats_alloc_bytes gauge\ngo_memstats_alloc_bytes %d\n", mem.Alloc)
+	fmt.Fprintf(w, "# TYPE go_memstats_sys_bytes gauge\ngo_memstats_sys_bytes %d\n", mem.Sys)
+	fmt.Fprintf(w, "# TYPE go_goroutines gauge\ngo_goroutines %d\n", runtime.NumGoroutine())
 }
