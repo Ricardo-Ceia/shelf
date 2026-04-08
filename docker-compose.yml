@@ -37,6 +37,14 @@ services:
     command: ["/data/metrics.log", ":9090"]
     restart: unless-stopped
 
+  top:
+    build:
+      context: .
+      target: shelf-top
+    profiles:
+      - tools
+    command: ["-url", "http://server:8080/metrics"]
+
 volumes:
   server_data:
   metrics_data:
