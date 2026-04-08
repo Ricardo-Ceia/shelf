@@ -82,6 +82,7 @@ func TestLoadConfig(t *testing.T) {
 
 	if err := os.WriteFile(path, []byte(`{
 		"output": "test.log",
+		"max_size_mb": 50,
 		"targets": [
 			{"name": "shelf", "url": "http://localhost:8080/metrics", "interval_seconds": 10}
 		]
@@ -96,6 +97,9 @@ func TestLoadConfig(t *testing.T) {
 
 	if cfg.Output != "test.log" {
 		t.Errorf("output = %q, want test.log", cfg.Output)
+	}
+	if cfg.MaxSizeMB != 50 {
+		t.Errorf("max_size_mb = %d, want 50", cfg.MaxSizeMB)
 	}
 
 	if len(cfg.Targets) != 1 {

@@ -23,8 +23,9 @@ type Target struct {
 }
 
 type Config struct {
-	Output  string   `json:"output"`
-	Targets []Target `json:"targets"`
+	Output    string   `json:"output"`
+	Targets   []Target `json:"targets"`
+	MaxSizeMB int      `json:"max_size_mb"` // 0 means unbounded
 }
 
 func loadConfig(path string) (*Config, error) {
@@ -227,6 +228,20 @@ func main() {
 				batchesOpen = false
 				continue
 			}
+
+			if cfg.MaxSizeMB > 0 {
+				stat, err := f.Stat()
+				if err == nil && stat.Size() > int64(cfg.MaxSizeMB)*1024*1024 {
+					log.Printf("file size %d exceeds limit of %d MB, truncating log", stat.Size(), cfg.MaxSizeMB)
+					if err := f.Truncate(0); err != nil {
+						log.Printf("error truncating file: %v", err)
+					}
+					if _, err := f.Seek(0, 0); err != nil {
+						log.Printf("error seeking after truncate: %v", err)
+					}
+				}
+			}
+
 			if err := writeMetrics(f, metrics); err != nil {
 				log.Printf("error writing metrics: %v", err)
 			}
