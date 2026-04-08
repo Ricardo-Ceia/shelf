@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  server:
+    build:
+      context: .
+      target: shelf-server
+    ports:
+      - "8080:8080"
+    volumes:
+      - server_data:/data
+    command: ["-addr", ":8080", "-data", "/data/shelf.db", "-shards", "16"]
+    restart: unless-stopped
+
+  collector:
+    build:
+      context: .
+      target: shelf-collector
+    depends_on:
+      - server
+    volumes:
+      - metrics_data:/data
+      - ./docker-targets.json:/app/targets.json:ro
+    command: ["/app/targets.json"]
+    restart: unless-stopped
+
+  query:
+    build:
+      context: .
+      target: shelf-query
+    ports:
+      - "9090:9090"
+    depends_on:
+      - collector
+    volumes:
+      - metrics_data:/data
+    command: ["/data/metrics.log", ":9090"]
+    restart: unless-stopped
+
+volumes:
+  server_data:
+  metrics_data:

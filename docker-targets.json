@@ -1,0 +1,10 @@
+{
+  "output": "/data/metrics.log",
+  "targets": [
+    {
+      "name": "shelf-docker",
+      "url": "http://server:8080/metrics",
+      "interval_seconds": 2
+    }
+  ]
+}
