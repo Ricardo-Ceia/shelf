@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -36,15 +38,16 @@ type MetricEntry struct {
 }
 
 type LogIndex struct {
-	path    string
-	mu      sync.RWMutex
-	entries []MetricEntry
-	offset  int64
-	partial string
+	path      string
+	retention time.Duration
+	mu        sync.RWMutex
+	entries   []MetricEntry
+	offset    int64
+	partial   string
 }
 
-func NewLogIndex(path string) (*LogIndex, error) {
-	idx := &LogIndex{path: path}
+func NewLogIndex(path string, retention time.Duration) (*LogIndex, error) {
+	idx := &LogIndex{path: path, retention: retention}
 	if err := idx.reload(); err != nil {
 		return nil, err
 	}
@@ -65,8 +68,24 @@ func (l *LogIndex) reload() error {
 	l.entries = entries
 	l.offset = stat.Size()
 	l.partial = ""
+	l.evictOldEntries()
 	l.mu.Unlock()
 	return nil
+}
+
+func (l *LogIndex) evictOldEntries() {
+	if l.retention <= 0 {
+		return
+	}
+	cutoff := time.Now().Add(-l.retention).Unix()
+	idx := sort.Search(len(l.entries), func(i int) bool {
+		return l.entries[i].Timestamp >= cutoff
+	})
+	if idx > 0 {
+		newEntries := make([]MetricEntry, len(l.entries)-idx)
+		copy(newEntries, l.entries[idx:])
+		l.entries = newEntries
+	}
 }
 
 func (l *LogIndex) Refresh() error {
@@ -125,6 +144,8 @@ func (l *LogIndex) Refresh() error {
 	}
 
 	l.offset += int64(n)
+	l.evictOldEntries()
+
 	return nil
 }
 
@@ -367,21 +388,25 @@ func executeQuery(entries []MetricEntry, q *Query) QueryResult {
 }
 
 func main() {
+	retention := flag.Duration("retention", 24*time.Hour, "Time-based retention limit for in-memory queries (0 to disable)")
+	flag.Parse()
+
 	logFile := "metrics.log"
 	addr := ":9090"
 
-	if len(os.Args) > 1 {
-		logFile = os.Args[1]
+	args := flag.Args()
+	if len(args) > 0 {
+		logFile = args[0]
 	}
-	if len(os.Args) > 2 {
-		addr = os.Args[2]
+	if len(args) > 1 {
+		addr = args[1]
 	}
 
 	if _, err := os.Stat(logFile); err != nil {
 		log.Fatalf("log file not accessible: %v", err)
 	}
 
-	index, err := NewLogIndex(logFile)
+	index, err := NewLogIndex(logFile, *retention)
 	if err != nil {
 		log.Fatalf("failed to initialize log index: %v", err)
 	}

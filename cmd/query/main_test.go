@@ -233,6 +233,28 @@ func TestExecuteQueryRate(t *testing.T) {
 	}
 }
 
+func TestEvictOldEntries(t *testing.T) {
+	now := time.Now().Unix()
+	idx := &LogIndex{
+		retention: time.Hour,
+		entries: []MetricEntry{
+			{Timestamp: now - 7200, Value: 1}, // 2 hours ago
+			{Timestamp: now - 4000, Value: 2}, // > 1 hour ago
+			{Timestamp: now - 3500, Value: 3}, // < 1 hour ago
+			{Timestamp: now - 1000, Value: 4}, // < 1 hour ago
+		},
+	}
+
+	idx.evictOldEntries()
+
+	if len(idx.entries) != 2 {
+		t.Fatalf("expected 2 entries after eviction, got %d", len(idx.entries))
+	}
+	if idx.entries[0].Value != 3 || idx.entries[1].Value != 4 {
+		t.Errorf("wrong entries retained: %+v", idx.entries)
+	}
+}
+
 func TestWriteJSON(t *testing.T) {
 	// Just verify it doesn't panic with valid input
 	// We can't easily test http.ResponseWriter without httptest

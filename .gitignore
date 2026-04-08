@@ -1,13 +1,13 @@
 # Binaries
-shelf
-server
-collector
-query
+/shelf
+/server
+/collector
+/query
 
 # Data directories
-shelf.db/
+/shelf.db/
 *.db/
-metrics.log
+/metrics.log
 
 # Temp files
 *.tmp
@@ -22,4 +22,4 @@ metrics.log
 # OS
 .DS_Store
 Thumbs.db
-bin/
+/bin/
