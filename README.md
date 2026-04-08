@@ -292,6 +292,23 @@ make run-demo        # Run the quick demo
 make help            # Show all targets
 ```
 
+### Try the CLI Dashboard (`cmd/top`)
+
+`shelf` comes with an `htop`-like visualization tool to monitor QPS, memory, and store size in real-time.
+
+**If running natively:**
+```bash
+make build
+./bin/server -addr :8080 -data ./shelf.db &
+./bin/top -url http://localhost:8080/metrics
+```
+
+**If running via Docker Compose:**
+```bash
+docker compose up -d --build
+docker compose run --rm top
+```
+
 ## Testing
 
 ```bash
