@@ -5,6 +5,7 @@ SERVER := $(BINARY_DIR)/server
 COLLECTOR := $(BINARY_DIR)/collector
 QUERY := $(BINARY_DIR)/query
 DEMO := $(BINARY_DIR)/demo
+TOP := $(BINARY_DIR)/top
 
 help:
 	@echo "Usage: make [target]"
@@ -20,7 +21,7 @@ help:
 	@echo "  run-query        Run the query API"
 	@echo "  run-demo         Run the quick demo"
 
-build: $(SERVER) $(COLLECTOR) $(QUERY) $(DEMO)
+build: $(SERVER) $(COLLECTOR) $(QUERY) $(DEMO) $(TOP)
 
 $(BINARY_DIR):
 	@mkdir -p $(BINARY_DIR)
@@ -36,6 +37,9 @@ $(QUERY): $(BINARY_DIR)
 
 $(DEMO): $(BINARY_DIR)
 	go build -o $(DEMO) ./cmd/demo
+
+$(TOP): $(BINARY_DIR)
+	go build -o $(TOP) ./cmd/top
 
 test:
 	go test -race -v ./...
