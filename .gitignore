@@ -23,3 +23,7 @@
 .DS_Store
 Thumbs.db
 /bin/
+
+#Demo gernerated files
+*.tape
+*.gif

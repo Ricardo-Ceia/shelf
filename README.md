@@ -12,23 +12,7 @@ Running **Redis** for state and **Prometheus** for metrics on a single node, an 
 **Shelf** is a production-grade, persistent Key-Value store and time-series metrics pipeline built in pure Go. It requires **zero external dependencies** and runs the entire stack in under 35MB of RAM.
 
 ### Live Demo (The `top` Dashboard)
-Shelf comes with an out-of-the-box CLI dashboard to monitor your node's health in real-time:
-
-```text
-=== SHELF NODE TOP ===
-
-System Health
-  Goroutines: 14
-  Memory:     1.24 MB (Alloc) / 8.50 MB (Sys)
-
-Data Store
-  Total Keys: 1042
-
-HTTP Server
-  Total Reqs: 8593
-  QPS:        145.2 req/s
-```
-
+![Shelf Top Dashboard](demo.gif)
 *(You can run this right now by typing: `docker compose run --rm top`)*
 
 ---
