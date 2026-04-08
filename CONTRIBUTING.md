@@ -2,7 +2,7 @@
 
 First off, thank you for considering contributing to Shelf! This project is built on extreme simplicity, zero dependencies, and high performance. We want to keep it that way, and your help is highly appreciated.
 
-## 🚀 How to get started
+## How to get started
 
 ### 1. The Core Philosophy
 Before you write any code, please understand the golden rule of Shelf: **Zero External Dependencies.**
@@ -39,20 +39,14 @@ Shelf has two layers of testing. You must ensure both pass before submitting a P
 
 ---
 
-## 💡 Finding something to work on
+## Finding something to work on
 
 If you're looking for a place to start, check out the [Issues](https://github.com/yourusername/shelf/issues) tab. Look for issues labeled:
 - `good first issue`: Perfect for newcomers to the codebase.
 - `help wanted`: Features or bugs we specifically need assistance with.
-
-**Some ideas for immediate contributions:**
-- Add `min()` / `max()` functions to the `query` API DSL.
-- Add an HTTP `DELETE` endpoint to the `query` API to manually clear the logs.
-- Add more internal telemetry metrics (e.g., `shelf_store_misses_total`) to the `metrics.go` registry.
-
 ---
 
-## 📝 Submitting a Pull Request (PR)
+## Submitting a Pull Request (PR)
 
 1. **Fork the repository.**
 2. **Create a branch** for your feature or bugfix (`git checkout -b feature/my-awesome-feature`).
@@ -66,11 +60,11 @@ We will review your PR as quickly as possible. Don't worry if we ask for changes
 
 ---
 
-## 🐛 Found a Bug?
+## Found a Bug?
 If you find a bug, please open an Issue. Include:
 1. What you did.
 2. What you expected to happen.
 3. What actually happened (with logs or stack traces if possible).
 
 ---
-Thank you for making Shelf better! 🗄️
+Thank you for making Shelf better!

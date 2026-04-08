@@ -5,13 +5,13 @@
 
 ---
 
-## 🛑 The Problem
+## The Problem
 Running **Redis** for state and **Prometheus** for metrics on a single node, an IoT edge device, or a small indie project is massive overkill. It wastes RAM, requires complex deployments, and pulls in heavy external dependencies.
 
-## 💡 The Solution
+## The Solution
 **Shelf** is a production-grade, persistent Key-Value store and time-series metrics pipeline built in pure Go. It requires **zero external dependencies** and runs the entire stack in under 35MB of RAM.
 
-### 📊 Live Demo (The `top` Dashboard)
+### Live Demo (The `top` Dashboard)
 Shelf comes with an out-of-the-box CLI dashboard to monitor your node's health in real-time:
 
 ```text
@@ -33,7 +33,7 @@ HTTP Server
 
 ---
 
-## ⚡ Quick Start (2 Minutes)
+## Quick Start (2 Minutes)
 
 You can run the entire Shelf cluster (KV Server, Metrics Collector, and Query API) using Docker Compose.
 
@@ -54,21 +54,21 @@ docker compose run --rm top
 
 ---
 
-## 🧠 Why this exists
+## Why this exists
 
 I built Shelf because I was tired of reaching for a 2GB observability and state stack for projects that could easily run on a Raspberry Pi or a $5 DigitalOcean droplet. 
 
 Shelf proves that you can have strong durability (Write-Ahead Logs, Snapshots) and rich operational visibility (Prometheus-format metrics, rate/sum queries, live dashboards) using **just the Go standard library**.
 
-## 🎯 Who is this for?
+## Who is this for?
 
-- **Edge / IoT Developers:** You need persistence and telemetry on low-power devices.
 - **Indie Hackers:** You want a complete backend stack that runs on a single cheap VPS.
+- **Edge / IoT Developers:** You need persistence and telemetry on low-power devices.
 - **Go Minimalists:** You believe in the power of the standard library and hate supply-chain bloat (`go.mod` with zero dependencies).
 
 ---
 
-## 🧩 Architecture
+## Architecture
 
 Shelf is composed of 4 independent, tiny binaries that work together:
 
@@ -83,7 +83,7 @@ Shelf is composed of 4 independent, tiny binaries that work together:
 
 ---
 
-## 🛠️ Real Usage Examples
+## Real Usage Examples
 
 ### 1. Interacting with the KV Store
 Shelf uses a standard REST API. Values must be base64-encoded to safely support binary data.
@@ -128,7 +128,7 @@ func main() {
 
 ---
 
-## ⚙️ Configuration & Guardrails
+## Configuration & Guardrails
 
 Shelf is designed not to crash your node. It includes built-in limits for memory and disk:
 
@@ -138,10 +138,10 @@ Shelf is designed not to crash your node. It includes built-in limits for memory
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 We love contributions! Whether it's a bug fix, a new query aggregation, or documentation.
 Please read our [Contributing Guide](CONTRIBUTING.md) to get started.
 
-## 📄 License
+## License
 MIT
