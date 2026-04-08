@@ -153,6 +153,7 @@ Scrapes `/metrics` from configured targets and appends to an append-only log fil
 ```json
 {
     "output": "metrics.log",
+    "max_size_mb": 50,
     "targets": [
         {
             "name": "shelf",
@@ -162,6 +163,8 @@ Scrapes `/metrics` from configured targets and appends to an append-only log fil
     ]
 }
 ```
+
+*Note: Set `max_size_mb` to limit disk usage. When the log exceeds this size, it will be automatically truncated. Set to 0 to disable (append forever).*
 
 **Usage:**
 
@@ -189,10 +192,12 @@ At startup, query builds an in-memory index of parsed entries and incrementally 
 **Usage:**
 
 ```bash
-./cmd/query                        # default: metrics.log on :9090
-./cmd/query metrics.log            # custom log file, default port
-./cmd/query metrics.log :9090      # custom log file and port
+./cmd/query                                 # default: metrics.log on :9090, 24h retention
+./cmd/query metrics.log                     # custom log file
+./cmd/query -retention 72h metrics.log :9090 # custom retention limit, custom log and port
 ```
+
+*Note: `query` stores all log entries in memory. Setting `-retention` to e.g. `24h` strictly bounds its RAM usage by evicting metrics older than 24 hours. Disable eviction with `-retention 0`.*
 
 **Query DSL:**
 
