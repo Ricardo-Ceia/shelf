@@ -2,13 +2,17 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"sync"
+	"syscall"
 	"time"
 )
 
@@ -137,6 +141,41 @@ func writeMetrics(f *os.File, metrics []metricLine) error {
 	return f.Sync()
 }
 
+func runTarget(ctx context.Context, target Target, client *http.Client, batches chan<- []metricLine, errCh chan<- error) {
+	ticker := time.NewTicker(time.Duration(target.Seconds) * time.Second)
+	defer ticker.Stop()
+
+	scrapeOnce := func() {
+		start := time.Now()
+		metrics, err := scrape(target, client)
+		if err != nil {
+			select {
+			case errCh <- err:
+			default:
+			}
+			return
+		}
+		if len(metrics) > 0 {
+			select {
+			case batches <- metrics:
+			case <-ctx.Done():
+				return
+			}
+		}
+		log.Printf("scraped %s: %d metrics in %s", target.Name, len(metrics), time.Since(start))
+	}
+
+	scrapeOnce()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			scrapeOnce()
+		}
+	}
+}
+
 func main() {
 	configPath := "targets.json"
 	if len(os.Args) > 1 {
@@ -158,38 +197,49 @@ func main() {
 
 	log.Printf("collector started, output=%s, targets=%d", cfg.Output, len(cfg.Targets))
 
-	type targetState struct {
-		target Target
-		ticker *time.Ticker
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
+
+	batches := make(chan []metricLine, max(1, len(cfg.Targets)*2))
+	errCh := make(chan error, max(1, len(cfg.Targets)*2))
+
+	var wg sync.WaitGroup
+	for _, t := range cfg.Targets {
+		wg.Add(1)
+		go func(target Target) {
+			defer wg.Done()
+			runTarget(ctx, target, client, batches, errCh)
+		}(t)
 	}
 
-	states := make([]targetState, len(cfg.Targets))
-	for i, t := range cfg.Targets {
-		states[i] = targetState{
-			target: t,
-			ticker: time.NewTicker(time.Duration(t.Seconds) * time.Second),
-		}
-	}
+	go func() {
+		wg.Wait()
+		close(batches)
+		close(errCh)
+	}()
 
-	for {
-		for i := range states {
-			s := &states[i]
-			select {
-			case <-s.ticker.C:
-				start := time.Now()
-				metrics, err := scrape(s.target, client)
-				if err != nil {
-					log.Printf("error: %v", err)
-					continue
-				}
-				if err := writeMetrics(f, metrics); err != nil {
-					log.Printf("error writing metrics: %v", err)
-				} else {
-					log.Printf("scraped %s: %d metrics in %s", s.target.Name, len(metrics), time.Since(start))
-				}
-			default:
+	batchesOpen := true
+	errOpen := true
+	for batchesOpen || errOpen {
+		select {
+		case metrics, ok := <-batches:
+			if !ok {
+				batchesOpen = false
+				continue
 			}
+			if err := writeMetrics(f, metrics); err != nil {
+				log.Printf("error writing metrics: %v", err)
+			}
+		case err, ok := <-errCh:
+			if !ok {
+				errOpen = false
+				continue
+			}
+			log.Printf("error: %v", err)
+		case <-ctx.Done():
+			cancel()
 		}
-		time.Sleep(100 * time.Millisecond)
 	}
+
+	log.Printf("collector stopped")
 }

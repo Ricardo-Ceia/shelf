@@ -101,6 +101,11 @@ All values are base64-encoded in JSON to support binary data.
 | `-data` | `./shelf.db` | Data directory |
 | `-shards` | `16` | Number of hash table shards |
 | `-snapshot` | `10000` | Auto-snapshot threshold (0 to disable) |
+| `-sync-writes` | `false` | `fsync` WAL on every write (stronger durability, lower throughput) |
+| `-max-value-bytes` | `1048576` | Maximum decoded value size accepted by `PUT /keys/{key}` |
+| `-read-timeout` | `5s` | HTTP read timeout |
+| `-write-timeout` | `10s` | HTTP write timeout |
+| `-idle-timeout` | `60s` | HTTP keep-alive idle timeout |
 
 ### Storage Engine
 
@@ -110,7 +115,7 @@ data/
   snapshot.db    (compact point-in-time state dump)
 ```
 
-**Write path**: Every `Set`/`Delete` appends a binary entry to `wal.log` (with CRC32 checksum), then applies to the in-memory hash table. WAL before memory guarantees durability.
+**Write path**: Every `Set`/`Delete` appends a binary entry to `wal.log` (with CRC32 checksum), then applies to the in-memory hash table. By default, WAL is synced on close/snapshot for lower write latency. Enable `-sync-writes` for per-write `fsync` durability.
 
 **Recovery**: On `Open()`, shelf loads `snapshot.db` (if valid), then replays `wal.log` entries on top. Corrupt snapshots are detected via CRC and discarded. Partial WAL entries (from crashes) are truncated.
 
@@ -178,6 +183,8 @@ One line per metric: `timestamp name{labels} value`. Append-only, no index, no c
 ### Query API
 
 Reads `metrics.log` and serves queries via HTTP.
+
+At startup, query builds an in-memory index of parsed entries and incrementally tails new appended data before each request. This avoids reparsing the full log file on every query while keeping the append-only file format unchanged.
 
 **Usage:**
 

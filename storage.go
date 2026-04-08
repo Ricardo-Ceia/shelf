@@ -27,6 +27,11 @@ type Store struct {
 	mu                  sync.Mutex
 	writesSinceSnapshot int
 	snapshotThreshold   int
+	syncOnWrite         bool
+}
+
+type StoreOptions struct {
+	SyncOnWrite bool
 }
 
 type walReader struct {
@@ -62,6 +67,10 @@ func (r *walReader) readN(n int) ([]byte, bool) {
 }
 
 func Open(dir string, numShards int, snapshotThreshold int) (*Store, error) {
+	return OpenWithOptions(dir, numShards, snapshotThreshold, StoreOptions{})
+}
+
+func OpenWithOptions(dir string, numShards int, snapshotThreshold int, opts StoreOptions) (*Store, error) {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return nil, fmt.Errorf("create directory: %w", err)
 	}
@@ -150,6 +159,7 @@ func Open(dir string, numShards int, snapshotThreshold int) (*Store, error) {
 		wal:                 f,
 		writesSinceSnapshot: writesSinceSnapshot,
 		snapshotThreshold:   snapshotThreshold,
+		syncOnWrite:         opts.SyncOnWrite,
 	}, nil
 }
 
@@ -206,6 +216,11 @@ func (s *Store) Set(key string, value []byte) error {
 	if _, err := s.wal.Write(entry); err != nil {
 		return fmt.Errorf("write WAL: %w", err)
 	}
+	if s.syncOnWrite {
+		if err := s.wal.Sync(); err != nil {
+			return fmt.Errorf("sync WAL: %w", err)
+		}
+	}
 
 	s.ht.Insert(key, value)
 	s.writesSinceSnapshot++
@@ -229,6 +244,11 @@ func (s *Store) Delete(key string) (bool, error) {
 	entry := encodeWALEntry(opDel, key, nil)
 	if _, err := s.wal.Write(entry); err != nil {
 		return false, fmt.Errorf("write WAL: %w", err)
+	}
+	if s.syncOnWrite {
+		if err := s.wal.Sync(); err != nil {
+			return false, fmt.Errorf("sync WAL: %w", err)
+		}
 	}
 
 	existed := s.ht.Delete(key)

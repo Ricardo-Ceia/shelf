@@ -1,14 +1,18 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
+	"syscall"
 	"time"
 )
 
@@ -29,6 +33,105 @@ type MetricEntry struct {
 	Name      string
 	Labels    string
 	Value     float64
+}
+
+type LogIndex struct {
+	path    string
+	mu      sync.RWMutex
+	entries []MetricEntry
+	offset  int64
+	partial string
+}
+
+func NewLogIndex(path string) (*LogIndex, error) {
+	idx := &LogIndex{path: path}
+	if err := idx.reload(); err != nil {
+		return nil, err
+	}
+	return idx, nil
+}
+
+func (l *LogIndex) reload() error {
+	entries, err := parseLog(l.path)
+	if err != nil {
+		return err
+	}
+	stat, err := os.Stat(l.path)
+	if err != nil {
+		return fmt.Errorf("stat log: %w", err)
+	}
+
+	l.mu.Lock()
+	l.entries = entries
+	l.offset = stat.Size()
+	l.partial = ""
+	l.mu.Unlock()
+	return nil
+}
+
+func (l *LogIndex) Refresh() error {
+	stat, err := os.Stat(l.path)
+	if err != nil {
+		return fmt.Errorf("stat log: %w", err)
+	}
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if stat.Size() < l.offset {
+		l.mu.Unlock()
+		err := l.reload()
+		l.mu.Lock()
+		return err
+	}
+
+	if stat.Size() == l.offset {
+		return nil
+	}
+
+	f, err := os.Open(l.path)
+	if err != nil {
+		return fmt.Errorf("open log: %w", err)
+	}
+	defer f.Close()
+
+	deltaSize := stat.Size() - l.offset
+	buf := make([]byte, deltaSize)
+	n, err := f.ReadAt(buf, l.offset)
+	if err != nil && n <= 0 {
+		return fmt.Errorf("read log delta: %w", err)
+	}
+	buf = buf[:n]
+
+	chunk := l.partial + string(buf)
+	lines := strings.Split(chunk, "\n")
+	if !strings.HasSuffix(chunk, "\n") {
+		l.partial = lines[len(lines)-1]
+		lines = lines[:len(lines)-1]
+	} else {
+		l.partial = ""
+	}
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		entry, err := parseLogLine(line)
+		if err != nil {
+			continue
+		}
+		l.entries = append(l.entries, entry)
+	}
+
+	l.offset += int64(n)
+	return nil
+}
+
+func (l *LogIndex) Execute(q *Query) QueryResult {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return executeQuery(l.entries, q)
 }
 
 func parseLog(path string) ([]MetricEntry, error) {
@@ -55,7 +158,6 @@ func parseLog(path string) ([]MetricEntry, error) {
 }
 
 func parseLogLine(line string) (MetricEntry, error) {
-	// Format: timestamp name{labels} value  or  timestamp name value
 	parts := strings.SplitN(line, " ", 3)
 	if len(parts) < 3 {
 		return MetricEntry{}, fmt.Errorf("invalid line format")
@@ -85,12 +187,7 @@ func parseLogLine(line string) (MetricEntry, error) {
 		name = nameAndLabels
 	}
 
-	return MetricEntry{
-		Timestamp: ts,
-		Name:      name,
-		Labels:    labels,
-		Value:     value,
-	}, nil
+	return MetricEntry{Timestamp: ts, Name: name, Labels: labels, Value: value}, nil
 }
 
 type Query struct {
@@ -139,7 +236,6 @@ func parseMetricSelector(s string) (*Query, error) {
 
 	q := &Query{}
 
-	// Check for time window: metric[5m]
 	if idx := strings.Index(s, "["); idx >= 0 {
 		if !strings.HasSuffix(s, "]") {
 			return nil, fmt.Errorf("unclosed bracket in %q", s)
@@ -153,7 +249,6 @@ func parseMetricSelector(s string) (*Query, error) {
 		q.Window = d
 	}
 
-	// Check for labels: metric{key="value"}
 	if idx := strings.Index(s, "{"); idx >= 0 {
 		if !strings.HasSuffix(s, "}") {
 			return nil, fmt.Errorf("unclosed brace in %q", s)
@@ -219,10 +314,7 @@ func executeQuery(entries []MetricEntry, q *Query) QueryResult {
 
 	if q.Func == "" {
 		for _, e := range filtered {
-			result.Data = append(result.Data, DataPoint{
-				Timestamp: e.Timestamp,
-				Value:     e.Value,
-			})
+			result.Data = append(result.Data, DataPoint{Timestamp: e.Timestamp, Value: e.Value})
 		}
 		return result
 	}
@@ -285,7 +377,17 @@ func main() {
 		addr = os.Args[2]
 	}
 
-	http.HandleFunc("/query", func(w http.ResponseWriter, r *http.Request) {
+	if _, err := os.Stat(logFile); err != nil {
+		log.Fatalf("log file not accessible: %v", err)
+	}
+
+	index, err := NewLogIndex(logFile)
+	if err != nil {
+		log.Fatalf("failed to initialize log index: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/query", func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query().Get("q")
 		if q == "" {
 			writeJSON(w, http.StatusBadRequest, QueryResult{Error: "missing query parameter 'q'"})
@@ -298,22 +400,45 @@ func main() {
 			return
 		}
 
-		entries, err := parseLog(logFile)
-		if err != nil {
+		if err := index.Refresh(); err != nil {
 			writeJSON(w, http.StatusInternalServerError, QueryResult{Error: err.Error()})
 			return
 		}
 
-		result := executeQuery(entries, parsed)
+		result := index.Execute(parsed)
 		writeJSON(w, http.StatusOK, result)
 	})
 
-	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 
-	log.Printf("query API listening on %s (log=%s)", addr, logFile)
-	log.Fatal(http.ListenAndServe(addr, nil))
+	httpServer := &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 2 * time.Second,
+		ReadTimeout:       5 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	go func() {
+		log.Printf("query API listening on %s (log=%s)", addr, logFile)
+		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal(err)
+		}
+	}()
+
+	<-ctx.Done()
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := httpServer.Shutdown(shutdownCtx); err != nil {
+		log.Printf("query API shutdown error: %v", err)
+	}
+	log.Printf("query API stopped")
 }
 
 func writeJSON(w http.ResponseWriter, status int, data any) {
